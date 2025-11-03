@@ -1,0 +1,30 @@
+name: 🚀 Deploy NestJS via SSH
+
+on:
+  push:
+    branches:
+      - duy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /home/ubuntu/nestjs-mongo-base
+            echo "Pulling latest code..."
+            git pull origin main
+            echo "Rebuilding Docker containers..."
+            export COMPOSE_HTTP_TIMEOUT=300
+            docker-compose down
+            docker-compose up -d --build
+            echo "Deployment complete!"
