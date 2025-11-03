@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: mongo_container
+    restart: always
+    ports:
+      - "27017:27017"
+    env_file: .env
+    volumes:
+      - mongo_data:/data/db
+
+  app:
+    build: .
+    container_name: nestjs_app
+    restart: always
+    env_file: .env
+    depends_on:
+      - mongo
+    ports:
+      - "3000:3000"
+    working_dir: /usr/src/app
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    command: >
+      sh -c "
+        echo ' Waiting for MongoDB to be ready...' &&
+        sleep 5 &&
+        echo 'Running migrations...' &&
+        npx migrate-mongo up &&
+        echo 'Migrations done! Starting NestJS...' &&
+        npm run start:dev
+      "
+
+volumes:
+  mongo_data:
