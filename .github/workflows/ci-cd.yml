@@ -22,7 +22,7 @@ jobs:
           script: |
             cd /home/ubuntu/nestjs-mongo-base
             echo "Pulling latest code..."
-            git pull origin main
+            git pull origin duy
             echo "Rebuilding Docker containers..."
             export COMPOSE_HTTP_TIMEOUT=300
             docker-compose down
