@@ -26,13 +26,31 @@ services:
       - /usr/src/app/node_modules
     command: >
       sh -c "
-        echo ' Waiting for MongoDB to be ready...' &&
+        echo 'Waiting for MongoDB to be ready...' &&
         sleep 5 &&
         echo 'Running migrations...' &&
         npx migrate-mongo up &&
         echo 'Migrations done! Starting NestJS...' &&
         npm run start:dev
       "
+
+  docs:
+    build: .
+    container_name: compodoc_server
+    restart: "no"
+    working_dir: /usr/src/app
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    command: >
+      sh -c "
+        echo 'Generating Compodoc documentation...' &&
+        npm run compodoc:serve
+      "
+    ports:
+      - "8080:8080"
+    depends_on:
+      - app
 
 volumes:
   mongo_data:
