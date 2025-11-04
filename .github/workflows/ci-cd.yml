@@ -23,8 +23,7 @@ jobs:
           script: |
             cd /root/intern001-dating-app-server
             echo "Pulling latest code..."
-            git fetch --all
-            git reset --hard origin/duy
+            git pull origin main
             echo " Rebuilding Docker containers..."
             export COMPOSE_HTTP_TIMEOUT=300
             docker-compose down
