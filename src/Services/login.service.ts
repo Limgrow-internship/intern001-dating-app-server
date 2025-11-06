@@ -20,24 +20,35 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const user = await this.findByEmail(email);
-    if (!user) throw new UnauthorizedException('Email không tồn tại');
-    console.log("USER PASSWORD IN DB:", user.password);
-    console.log("PLAINTEXT:", password);
-    console.log("COMPARE:", await bcrypt.compare(password, user.password));
+    if (!user) {
+      throw new UnauthorizedException('Email không tồn tại');
+    }
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match) throw new UnauthorizedException('Invalid Password');
+    if (!match) {
+      throw new UnauthorizedException('Mật khẩu không đúng');
+    }
 
     const accessToken = this.jwt.sign(
-      { id: user.id, email: user.email },
+      { id: user._id, email: user.email },
       { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '15m' }
     );
 
     const refreshToken = this.jwt.sign(
-      { id: user.id, email: user.email },
+      { id: user._id, email: user.email },
       { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' }
     );
 
-    return { accessToken, refreshToken };
+    const userInfo = {
+      id: user._id,
+      email: user.email
+    };
+
+    return {
+      user: userInfo,
+      accessToken,
+      refreshToken,
+      message: 'Đăng nhập thành công'
+    };
   }
 }
