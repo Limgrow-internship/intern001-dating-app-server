@@ -1,7 +1,7 @@
 import { IsEmail, Matches, MinLength } from 'class-validator';
 
 export class Login {
-  @IsEmail({}, { message: 'Email không hợp lệ' })
+  @Matches(/^[a-zA-Z0-9._%+-]+@gmail\.com$/, { message: 'invalid email' })
   email: string;
 
   @MinLength(8, { message: 'Mật khẩu phải có ít nhất 8 ký tự' })
