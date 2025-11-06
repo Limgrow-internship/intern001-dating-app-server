@@ -11,9 +11,9 @@ import { UserModule } from './modules/user.modules';
     ConfigModule.forRoot({ isGlobal: true }),
     MongooseModule.forRootAsync({ useFactory: databaseConfig }),
 
-    // ✅ Import 2 module chính
+    //✅ Import 2 module chính
     AuthModule,
     UserModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }
