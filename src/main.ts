@@ -8,7 +8,14 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.enableCors();
-  app.useGlobalPipes(new ValidationPipe({ transform: true }));
+  app.useGlobalPipes(
+  new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true, 
+    transform: true, 
+    transformOptions: { enableImplicitConversion: true }
+  })
+);
 
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
