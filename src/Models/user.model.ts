@@ -12,7 +12,7 @@ export class User {
     @Prop({ required: true, unique: true })
     email: string;
 
-    @Prop({})
+    @Prop({ unique: true, sparse: true })
     phoneNumber?: string;
 
     @Prop({ required: true })
