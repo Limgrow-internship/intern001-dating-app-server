@@ -1,4 +1,4 @@
-//Tạo bảng tạm để lưu OTP và thời hạn hiệu lực
+// email-verification.model.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
@@ -20,6 +20,15 @@ export class EmailVerification {
 
     @Prop({ default: 0 })
     attempts: number;
+
+    @Prop({ default: 0 })
+    resendCount: number;
+
+    @Prop({ type: Date, default: null })
+    lastOtpSentAt: Date | null;
+
+    @Prop({ type: Date, default: null })
+    lockedUntil: Date | null;
 }
 
 export const EmailVerificationSchema = SchemaFactory.createForClass(EmailVerification);

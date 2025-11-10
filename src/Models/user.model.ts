@@ -1,14 +1,14 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-import { v4 as uuid } from 'uuid'; 
+import { v4 as uuid } from 'uuid';
 
 export type UserDocument = User & Document;
 
 @Schema({ timestamps: true })
 export class User {
-     @Prop({ type: String, default: () => uuid(), unique: true })
+    @Prop({ type: String, default: () => uuid(), unique: true })
     id: string;
-    
+
     @Prop({ required: true, unique: true })
     email: string;
 
@@ -18,19 +18,15 @@ export class User {
     @Prop({ required: true })
     password: string;
 
-    // 🟢 Dùng để xác thực email
     @Prop()
     otp?: string;
 
-    // 🕐 Thời điểm hết hạn của mã OTP (vd: 60 giây sau khi gửi)
     @Prop()
     otpExpires?: Date;
 
-    // 🔢 Số lần người dùng nhập sai OTP
     @Prop({ default: 0 })
     otpAttempts?: number;
 
-    // ⏱️ Lần cuối cùng hệ thống gửi OTP (để chặn spam gửi lại trong 60s)
     @Prop()
     lastOtpSentAt?: Date;
 

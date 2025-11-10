@@ -1,10 +1,10 @@
 import { IsEmail, IsNotEmpty, Matches } from 'class-validator';
 
 export class VerifyOtpDto {
-    @IsEmail({}, { message: 'Email không hợp lệ' })
+    @IsEmail({}, { message: 'Email invalid' })
     email: string;
 
-    @IsNotEmpty({ message: 'Vui lòng nhập mã xác thực' })
-    @Matches(/^\d{6}$/, { message: 'OTP phải gồm 6 ký tự số' })
+    @IsNotEmpty({ message: 'Please enter OTP' })
+    @Matches(/^\d{4}$/, { message: 'OTP must consist of 4 numeric characters' })
     otp: string;
 }

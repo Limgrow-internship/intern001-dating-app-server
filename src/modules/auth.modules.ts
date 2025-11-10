@@ -7,10 +7,10 @@ import { UserModule } from '../modules/user.modules';
 
 @Module({
   imports: [
-    UserModule, // ✅ Inject UserModel vào AuthService
-    JwtModule.register({}) // để sign/verify token
+    UserModule,
+    JwtModule.register({})
   ],
   controllers: [AuthController],
   providers: [AuthService],
 })
-export class AuthModule {}
+export class AuthModule { }
