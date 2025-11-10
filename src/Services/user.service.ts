@@ -88,35 +88,77 @@ export class UserService {
     }
 
     async verifyOtp(email: string, otp: string) {
-        const record = await this.emailVerifyModel.findOne({ email });
-        if (!record) throw new BadRequestException('No OTP request found for this email.');
+        try {
+            console.log('🟢 Verify OTP called with:', { email, otp });
 
-        if (record.otpExpiresAt.getTime() < Date.now()) {
-            await this.emailVerifyModel.deleteOne({ email });
-            throw new BadRequestException('OTP has expired. Please request a new one.');
-        }
-
-        if (record.otp !== otp) {
-            record.attempts += 1;
-            await record.save();
-
-            if (record.attempts >= 3) {
-                await this.emailVerifyModel.deleteOne({ email });
-                throw new BadRequestException('Too many incorrect attempts. Please register again.');
+            const record = await this.emailVerifyModel.findOne({ email });
+            if (!record) {
+                console.warn('⚠️ No OTP record found for email:', email);
+                throw new BadRequestException('No OTP request found for this email.');
             }
 
-            throw new BadRequestException('Incorrect OTP. Please try again.');
+            console.log('✅ OTP record found:', {
+                email: record.email,
+                otp: record.otp,
+                otpExpiresAt: record.otpExpiresAt,
+                attempts: record.attempts,
+                passwordExists: !!record.password,
+            });
+
+            if (!record.otpExpiresAt) {
+                console.error('❌ Missing otpExpiresAt in record for:', email);
+                await this.emailVerifyModel.deleteOne({ email });
+                throw new BadRequestException('Invalid OTP record. Please request a new OTP.');
+            }
+
+            if (record.otpExpiresAt.getTime() < Date.now()) {
+                console.warn('⏰ OTP expired for:', email);
+                await this.emailVerifyModel.deleteOne({ email });
+                throw new BadRequestException('OTP has expired. Please request a new one.');
+            }
+
+            if (record.otp !== otp) {
+                record.attempts += 1;
+                await record.save();
+
+                console.warn(`❌ Incorrect OTP for ${email}. Attempt ${record.attempts}/3`);
+
+                if (record.attempts >= 3) {
+                    await this.emailVerifyModel.deleteOne({ email });
+                    throw new BadRequestException('Too many incorrect attempts. Please register again.');
+                }
+
+                throw new BadRequestException('Incorrect OTP. Please try again.');
+            }
+
+            console.log('🔐 OTP verified successfully, creating user...');
+
+            const newUser = new this.userModel({
+                email: record.email,
+                password: record.password,
+                status: 'active',
+            });
+
+            try {
+                await newUser.save();
+                console.log('✅ User created successfully:', record.email);
+            } catch (saveErr) {
+                console.error('❌ Error saving user:', saveErr);
+                throw new InternalServerErrorException('Database error while creating user.');
+            }
+
+            await this.emailVerifyModel.deleteOne({ email });
+            console.log('🧹 Deleted email verification record for:', email);
+
+            return { message: 'Verification successful. Account created.' };
+
+        } catch (err) {
+            console.error('🔥 verifyOtp() error:', err);
+            if (err instanceof BadRequestException || err instanceof InternalServerErrorException) {
+                throw err;
+            }
+            throw new InternalServerErrorException('Unexpected error while verifying OTP.');
         }
-
-        const newUser = new this.userModel({
-            email: record.email,
-            password: record.password,
-            status: 'active',
-        });
-        await newUser.save();
-
-        await this.emailVerifyModel.deleteOne({ email });
-
-        return { message: 'Verification successful. Account created.' };
     }
+
 }
