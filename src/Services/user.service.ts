@@ -1,10 +1,11 @@
-import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer';
 import { EmailVerification, EmailVerificationDocument } from '../Models/email-verification.model';
 import { User, UserDocument } from '../Models/user.model';
+import { UpdateProfileDto } from '../DTO/update-profile.dto';
 
 @Injectable()
 export class UserService {
@@ -118,5 +119,31 @@ export class UserService {
         await this.emailVerifyModel.deleteOne({ email });
 
         return { message: 'Verification successful. Account created.' };
+    }
+
+    async getUserProfile(userId: string) {
+        const user = await this.userModel.findOne({ id: userId }).select('-password -otp -otpExpires -otpAttempts');
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        return user;
+    }
+
+    async updateUserProfile(userId: string, updateProfileDto: UpdateProfileDto) {
+        const user = await this.userModel.findOne({ id: userId });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        const updatedUser = await this.userModel.findOneAndUpdate(
+            { id: userId },
+            { $set: updateProfileDto },
+            { new: true }
+        ).select('-password -otp -otpExpires -otpAttempts');
+
+        return updatedUser;
     }
 }

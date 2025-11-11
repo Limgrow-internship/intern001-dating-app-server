@@ -44,6 +44,33 @@ export class User {
 
     @Prop({ type: [String], default: [] })
     deviceTokens: string[];
+
+    @Prop()
+    firstName?: string;
+
+    @Prop()
+    lastName?: string;
+
+    @Prop()
+    dateOfBirth?: Date;
+
+    @Prop()
+    gender?: string;
+
+    @Prop()
+    bio?: string;
+
+    @Prop()
+    profilePicture?: string;
+
+    @Prop({ type: [String], default: [] })
+    interests: string[];
+
+    @Prop()
+    location?: string;
+
+    @Prop({ type: Number, min: 18, max: 100 })
+    age?: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
