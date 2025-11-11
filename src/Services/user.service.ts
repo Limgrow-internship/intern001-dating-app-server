@@ -189,14 +189,14 @@ export class UserService {
     }
 
     async changePassword(
-        email: string,
+        userId: string,
         oldPassword: string,
         newPassword: string,
         confirmPassword: string,
         deviceInfo: string,
     ) {
         try {
-            const user = await this.userModel.findOne({ email });
+            const user = await this.userModel.findOne({ id: userId });
             if (!user) {
                 throw new BadRequestException('User not found');
             }
@@ -243,7 +243,7 @@ export class UserService {
                 throw new InternalServerErrorException('Không thể kết nối tới máy chủ');
             }
 
-            console.error('❌ Lỗi đổi mật khẩu:', error);
+            console.error('Lỗi đổi mật khẩu:', error);
             throw new InternalServerErrorException('Đã xảy ra lỗi, vui lòng thử lại');
         }
     }

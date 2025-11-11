@@ -23,35 +23,40 @@ export class UsersController {
     }
 
     @Put('change-password')
-    async changePassword(@Body() dto: ChangePasswordDto) {
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiResponse({ status: 200, description: 'Change password successfully' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    changePassword(@Request() req, @Body() body: ChangePasswordDto) {
+
         return this.userService.changePassword(
-            dto.email,
-            dto.oldPassword,
-            dto.newPassword,
-            dto.confirmPassword,
-            dto.deviceInfo,
+            req.user.userId,
+            body.oldPassword,
+            body.newPassword,
+            body.confirmPassword,
+            body.deviceInfo
         );
+    }
 
-        @Get('profile')
-        @UseGuards(JwtAuthGuard)
-        @ApiBearerAuth()
-        @ApiOperation({ summary: 'Get user profile' })
-        @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
-        @ApiResponse({ status: 401, description: 'Unauthorized' })
-        @ApiResponse({ status: 404, description: 'User not found' })
-        async getProfile(@Request() req) {
-            return this.userService.getUserProfile(req.user.userId);
-        }
+    @Get('profile')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Get user profile' })
+    @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    @ApiResponse({ status: 404, description: 'User not found' })
+    async getProfile(@Request() req) {
+        return this.userService.getUserProfile(req.user.userId);
+    }
 
-        @Put('profile')
-        @UseGuards(JwtAuthGuard)
-        @ApiBearerAuth()
-        @ApiOperation({ summary: 'Update user profile' })
-        @ApiResponse({ status: 200, description: 'Profile updated successfully' })
-        @ApiResponse({ status: 401, description: 'Unauthorized' })
-        @ApiResponse({ status: 404, description: 'User not found' })
-        async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
-            return this.userService.updateUserProfile(req.user.userId, updateProfileDto);
-        }
+    @Put('profile')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Update user profile' })
+    @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    @ApiResponse({ status: 404, description: 'User not found' })
+    async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
+        return this.userService.updateUserProfile(req.user.userId, updateProfileDto);
     }
 }

@@ -1,9 +1,6 @@
 import { IsEmail, IsString, MinLength } from 'class-validator';
 
 export class ChangePasswordDto {
-    @IsEmail()
-    email: string;
-
     @IsString()
     oldPassword: string;
 
@@ -16,3 +13,4 @@ export class ChangePasswordDto {
     @IsString()
     deviceInfo: string;
 }
+
