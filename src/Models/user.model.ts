@@ -12,7 +12,7 @@ export class User {
     @Prop({ required: true, unique: true })
     email: string;
 
-    @Prop({ unique: true })
+    @Prop({ unique: true, sparse: true })
     phoneNumber?: string;
 
     @Prop({ required: true })
@@ -50,6 +50,33 @@ export class User {
         changedAt: Date;
         device: string;
     }>;
+
+    @Prop()
+    firstName?: string;
+
+    @Prop()
+    lastName?: string;
+
+    @Prop()
+    dateOfBirth?: Date;
+
+    @Prop()
+    gender?: string;
+
+    @Prop()
+    bio?: string;
+
+    @Prop()
+    profilePicture?: string;
+
+    @Prop({ type: [String], default: [] })
+    interests: string[];
+
+    @Prop()
+    location?: string;
+
+    @Prop({ type: Number, min: 18, max: 100 })
+    age?: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

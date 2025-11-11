@@ -1,9 +1,13 @@
-import { Body, Controller, Post, Put } from '@nestjs/common';
 import { UserService } from '../Services/user.service';
 import { CreateUserDto } from '../DTO/create-user.dto';
 import { VerifyOtpDto } from '../DTO/verify-otp.dto';
 import { ChangePasswordDto } from '../DTO/change-password.dto';
+import { Body, Controller, Post, Get, Put, UseGuards, Request } from '@nestjs/common';
+import { UpdateProfileDto } from '../DTO/update-profile.dto';
+import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('User')
 @Controller('user')
 export class UsersController {
     constructor(private readonly userService: UserService) { }
@@ -19,7 +23,7 @@ export class UsersController {
     }
 
     @Put('change-password')
-    changePassword(@Body() dto: ChangePasswordDto) {
+    async changePassword(@Body() dto: ChangePasswordDto) {
         return this.userService.changePassword(
             dto.email,
             dto.oldPassword,
@@ -27,5 +31,27 @@ export class UsersController {
             dto.confirmPassword,
             dto.deviceInfo,
         );
+
+        @Get('profile')
+        @UseGuards(JwtAuthGuard)
+        @ApiBearerAuth()
+        @ApiOperation({ summary: 'Get user profile' })
+        @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
+        @ApiResponse({ status: 401, description: 'Unauthorized' })
+        @ApiResponse({ status: 404, description: 'User not found' })
+        async getProfile(@Request() req) {
+            return this.userService.getUserProfile(req.user.userId);
+        }
+
+        @Put('profile')
+        @UseGuards(JwtAuthGuard)
+        @ApiBearerAuth()
+        @ApiOperation({ summary: 'Update user profile' })
+        @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+        @ApiResponse({ status: 401, description: 'Unauthorized' })
+        @ApiResponse({ status: 404, description: 'User not found' })
+        async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
+            return this.userService.updateUserProfile(req.user.userId, updateProfileDto);
+        }
     }
 }
