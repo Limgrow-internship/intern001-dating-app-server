@@ -119,4 +119,64 @@ export class UserService {
 
         return { message: 'Verification successful. Account created.' };
     }
+
+    async changePassword(
+        email: string,
+        oldPassword: string,
+        newPassword: string,
+        confirmPassword: string,
+        deviceInfo: string,
+    ) {
+        try {
+            const user = await this.userModel.findOne({ email });
+            if (!user) {
+                throw new BadRequestException('User not found');
+            }
+
+            if (newPassword !== confirmPassword) {
+                throw new BadRequestException(
+                    'Mật khẩu mới và xác nhận mật khẩu không trùng khớp'
+                );
+            }
+
+            if (newPassword.length < 8) {
+                throw new BadRequestException('Mật khẩu mới quá ngắn');
+            }
+
+            const isOldPasswordCorrect = await bcrypt.compare(oldPassword, user.password);
+            if (!isOldPasswordCorrect) {
+                throw new BadRequestException('Mật khẩu cũ không chính xác');
+            }
+
+            const sameAsOld = await bcrypt.compare(newPassword, user.password);
+            if (sameAsOld) {
+                throw new BadRequestException('Mật khẩu mới không được trùng với mật khẩu cũ');
+            }
+
+            const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+            user.password = hashedNewPassword;
+
+            user.deviceTokens = [];
+
+            user.passwordHistory.push({
+                changedAt: new Date(),
+                device: deviceInfo,
+            });
+
+            await user.save();
+
+            return { message: 'Đổi mật khẩu thành công' };
+
+        } catch (error) {
+            if (error instanceof BadRequestException) {
+                throw error;
+            }
+            if (error.name === 'MongoNetworkError' || error.name === 'MongooseServerSelectionError') {
+                throw new InternalServerErrorException('Không thể kết nối tới máy chủ');
+            }
+
+            console.error('❌ Lỗi đổi mật khẩu:', error);
+            throw new InternalServerErrorException('Đã xảy ra lỗi, vui lòng thử lại');
+        }
+    }
 }
