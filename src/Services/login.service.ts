@@ -30,17 +30,17 @@ export class AuthService {
     }
 
     const accessToken = this.jwt.sign(
-      { id: user._id, email: user.email },
+      { userId: user.id, email: user.email },
       { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '15m' }
     );
 
     const refreshToken = this.jwt.sign(
-      { id: user._id, email: user.email },
+      { userId: user.id, email: user.email },
       { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' }
     );
 
     const userInfo = {
-      id: user._id,
+      id: user.id,
       email: user.email
     };
 
