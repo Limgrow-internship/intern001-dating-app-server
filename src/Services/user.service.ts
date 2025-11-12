@@ -36,7 +36,9 @@ export class UserService {
             }
 
             if (existingRecord.resendCount >= 5) {
-                if (existingRecord.lockedUntil && existingRecord.lockedUntil > now) {
+                const now = new Date();
+
+                if (existingRecord.lockedUntil && existingRecord.lockedUntil.getTime() > now.getTime()) {
                     const minutesLeft = Math.ceil((existingRecord.lockedUntil.getTime() - now.getTime()) / 60000);
                     throw new BadRequestException(`Too many OTP requests. Try again after ${minutesLeft} minutes`);
                 } else {
@@ -45,6 +47,7 @@ export class UserService {
                     throw new BadRequestException('Too many OTP requests. You are locked for 15 minutes.');
                 }
             }
+
         }
 
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
