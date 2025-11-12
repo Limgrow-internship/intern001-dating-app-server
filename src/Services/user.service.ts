@@ -193,7 +193,6 @@ export class UserService {
 
     async changePassword(
         userId: string,
-        oldPassword: string,
         newPassword: string,
         confirmPassword: string,
         deviceInfo: string,
@@ -206,22 +205,17 @@ export class UserService {
 
             if (newPassword !== confirmPassword) {
                 throw new BadRequestException(
-                    'Mật khẩu mới và xác nhận mật khẩu không trùng khớp'
+                    'New password and confirmation password do not match'
                 );
             }
 
             if (newPassword.length < 8) {
-                throw new BadRequestException('Mật khẩu mới quá ngắn');
-            }
-
-            const isOldPasswordCorrect = await bcrypt.compare(oldPassword, user.password);
-            if (!isOldPasswordCorrect) {
-                throw new BadRequestException('Mật khẩu cũ không chính xác');
+                throw new BadRequestException('New password is too short');
             }
 
             const sameAsOld = await bcrypt.compare(newPassword, user.password);
             if (sameAsOld) {
-                throw new BadRequestException('Mật khẩu mới không được trùng với mật khẩu cũ');
+                throw new BadRequestException('New password cannot be the same as the old password');
             }
 
             const hashedNewPassword = await bcrypt.hash(newPassword, 10);
@@ -236,18 +230,18 @@ export class UserService {
 
             await user.save();
 
-            return { message: 'Đổi mật khẩu thành công' };
+            return { message: 'Password changed successfully' };
 
         } catch (error) {
             if (error instanceof BadRequestException) {
                 throw error;
             }
             if (error.name === 'MongoNetworkError' || error.name === 'MongooseServerSelectionError') {
-                throw new InternalServerErrorException('Không thể kết nối tới máy chủ');
+                throw new InternalServerErrorException('Cannot connect to server');
             }
 
-            console.error('Lỗi đổi mật khẩu:', error);
-            throw new InternalServerErrorException('Đã xảy ra lỗi, vui lòng thử lại');
+            console.error('Error changing password:', error);
+            throw new InternalServerErrorException('An error occurred, please try again');
         }
     }
 }

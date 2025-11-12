@@ -31,7 +31,6 @@ export class UsersController {
 
         return this.userService.changePassword(
             req.user.userId,
-            body.oldPassword,
             body.newPassword,
             body.confirmPassword,
             body.deviceInfo
