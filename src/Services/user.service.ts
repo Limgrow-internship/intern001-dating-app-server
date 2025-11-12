@@ -1,10 +1,11 @@
-import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer';
 import { EmailVerification, EmailVerificationDocument } from '../Models/email-verification.model';
 import { User, UserDocument } from '../Models/user.model';
+import { UpdateProfileDto } from '../DTO/update-profile.dto';
 
 @Injectable()
 export class UserService {
@@ -35,7 +36,9 @@ export class UserService {
             }
 
             if (existingRecord.resendCount >= 5) {
-                if (existingRecord.lockedUntil && existingRecord.lockedUntil > now) {
+                const now = new Date();
+
+                if (existingRecord.lockedUntil && existingRecord.lockedUntil.getTime() > now.getTime()) {
                     const minutesLeft = Math.ceil((existingRecord.lockedUntil.getTime() - now.getTime()) / 60000);
                     throw new BadRequestException(`Too many OTP requests. Try again after ${minutesLeft} minutes`);
                 } else {
@@ -44,6 +47,7 @@ export class UserService {
                     throw new BadRequestException('Too many OTP requests. You are locked for 15 minutes.');
                 }
             }
+
         }
 
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
@@ -161,4 +165,83 @@ export class UserService {
         }
     }
 
+    async getUserProfile(userId: string) {
+        const user = await this.userModel.findOne({ id: userId }).select('-password -otp -otpExpires -otpAttempts');
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        return user;
+    }
+
+    async updateUserProfile(userId: string, updateProfileDto: UpdateProfileDto) {
+        const user = await this.userModel.findOne({ id: userId });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        const updatedUser = await this.userModel.findOneAndUpdate(
+            { id: userId },
+            { $set: updateProfileDto },
+            { new: true }
+        ).select('-password -otp -otpExpires -otpAttempts');
+
+        return updatedUser;
+    }
+
+    async changePassword(
+        userId: string,
+        newPassword: string,
+        confirmPassword: string,
+        deviceInfo: string,
+    ) {
+        try {
+            const user = await this.userModel.findOne({ id: userId });
+            if (!user) {
+                throw new BadRequestException('User not found');
+            }
+
+            if (newPassword !== confirmPassword) {
+                throw new BadRequestException(
+                    'New password and confirmation password do not match'
+                );
+            }
+
+            if (newPassword.length < 8) {
+                throw new BadRequestException('New password is too short');
+            }
+
+            const sameAsOld = await bcrypt.compare(newPassword, user.password);
+            if (sameAsOld) {
+                throw new BadRequestException('New password cannot be the same as the old password');
+            }
+
+            const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+            user.password = hashedNewPassword;
+
+            user.deviceTokens = [];
+
+            user.passwordHistory.push({
+                changedAt: new Date(),
+                device: deviceInfo,
+            });
+
+            await user.save();
+
+            return { message: 'Password changed successfully' };
+
+        } catch (error) {
+            if (error instanceof BadRequestException) {
+                throw error;
+            }
+            if (error.name === 'MongoNetworkError' || error.name === 'MongooseServerSelectionError') {
+                throw new InternalServerErrorException('Cannot connect to server');
+            }
+
+            console.error('Error changing password:', error);
+            throw new InternalServerErrorException('An error occurred, please try again');
+        }
+    }
 }
