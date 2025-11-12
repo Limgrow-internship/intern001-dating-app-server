@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Get, Put, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, Post, Get, Put, UseGuards, Request, Delete, Req } from '@nestjs/common';
 import { UserService } from '../Services/user.service';
 import { CreateUserDto } from '../DTO/create-user.dto';
 import { VerifyOtpDto } from '../DTO/verify-otp.dto';
@@ -42,4 +42,11 @@ export class UsersController {
     async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
         return this.userService.updateUserProfile(req.user.userId, updateProfileDto);
     }
+    @UseGuards(JwtAuthGuard)
+    @Delete('/account')
+    async deleteAccount(@Req() req) {
+        const userId = req.user.userId;
+    await this.userService.deleteAccount(userId);
+    return { message: "Your account has been deleted successfully!" };
+}
 }

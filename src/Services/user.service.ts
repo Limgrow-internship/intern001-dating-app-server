@@ -187,4 +187,8 @@ export class UserService {
 
         return updatedUser;
     }
+
+    async deleteAccount(userId: string): Promise<void> {
+        await this.userModel.deleteOne({ id: userId });
+}
 }
