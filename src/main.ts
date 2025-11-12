@@ -19,13 +19,33 @@ async function bootstrap() {
 
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
-      .setTitle('My NestJS API')
-      .setDescription('API documentation')
+      .setTitle('Dating App API')
+      .setDescription('API documentation for Dating App - Complete flow: Signup → Login → Update Profile')
       .setVersion('1.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'JWT',
+          description: 'Enter JWT token',
+          in: 'header',
+        },
+        'JWT-auth', // This name must match the @ApiBearerAuth() decorator
+      )
+      .addTag('Auth', 'Authentication endpoints - Login, Refresh Token')
+      .addTag('User', 'User management - Signup (OTP), Get/Update Profile')
+      .addTag('Profile', 'Profile management - Separate profile operations')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api-docs', app, document);
+    SwaggerModule.setup('api-docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true, // Keep authorization when refresh page
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
+      },
+    });
 
     console.log('Swagger is running at: http://localhost:3000/api-docs');
   }
