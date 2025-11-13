@@ -44,6 +44,11 @@ export class UpdateProfileDto {
     @IsString()
     location?: string;
 
+    @ApiPropertyOptional({ description: 'Mode of the user' })
+    @IsOptional()
+    @IsString()
+    mode?: string;
+
     @ApiPropertyOptional({ description: 'Age of the user (18-100)', minimum: 18, maximum: 100 })
     @IsOptional()
     @IsNumber()
