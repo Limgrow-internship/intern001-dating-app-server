@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsDateString, IsArray, IsNumber, Min, Max, IsIn } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 export class UpdateProfileDto {
     @ApiPropertyOptional({ description: 'First name of the user' })
@@ -33,6 +34,18 @@ export class UpdateProfileDto {
     @IsString()
     profilePicture?: string;
 
+    @ApiPropertyOptional({ description: 'Profile image URL (alias for profilePicture)' })
+    @IsOptional()
+    @IsString()
+    @Transform(({ value, obj }) => {
+        // If profileImageUrl is provided, map it to profilePicture
+        if (value && !obj.profilePicture) {
+            obj.profilePicture = value;
+        }
+        return undefined; // Remove this field after transformation
+    })
+    profileImageUrl?: string;
+
     @ApiPropertyOptional({ description: 'List of interests', type: [String] })
     @IsOptional()
     @IsArray()
@@ -55,4 +68,15 @@ export class UpdateProfileDto {
     @Min(18)
     @Max(100)
     age?: number;
+
+    @ApiPropertyOptional({ description: 'Mode: dating or friend', enum: ['dating', 'friend', 'Dating Mode', 'Friend Mode'] })
+    @IsOptional()
+    @IsString()
+    @Transform(({ value }) => {
+        if (value === 'Dating Mode') return 'dating';
+        if (value === 'Friend Mode') return 'friend';
+        return value;
+    })
+    @IsIn(['dating', 'friend'])
+    mode?: string;
 }

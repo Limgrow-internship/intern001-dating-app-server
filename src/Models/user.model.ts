@@ -80,6 +80,9 @@ export class User {
 
     @Prop({ type: Number, min: 18, max: 100 })
     age?: number;
+
+    @Prop({ type: String, enum: ['dating', 'friend'], default: 'dating' })
+    mode?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

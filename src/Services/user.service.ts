@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer';
 import { EmailVerification, EmailVerificationDocument } from '../Models/email-verification.model';
 import { User, UserDocument } from '../Models/user.model';
+import { Profile, ProfileDocument } from '../Models/profile.model';
 import { UpdateProfileDto } from '../DTO/update-profile.dto';
 
 @Injectable()
@@ -14,6 +15,8 @@ export class UserService {
         private emailVerifyModel: Model<EmailVerificationDocument>,
         @InjectModel(User.name)
         private userModel: Model<UserDocument>,
+        @InjectModel(Profile.name)
+        private profileModel: Model<ProfileDocument>,
     ) { }
 
     async requestOtp(email: string, password: string) {
