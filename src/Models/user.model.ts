@@ -75,6 +75,9 @@ export class User {
     @Prop()
     location?: string;
 
+    @Prop()
+    mode?: string;
+
     @Prop({ type: Number, min: 18, max: 100 })
     age?: number;
 }
