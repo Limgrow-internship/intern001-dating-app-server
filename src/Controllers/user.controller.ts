@@ -1,7 +1,8 @@
-import { Body, Controller, Post, Get, Put, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, Post, Get, Put, UseGuards, Request, Delete, Req } from '@nestjs/common';
 import { UserService } from '../Services/user.service';
 import { CreateUserDto } from '../DTO/create-user.dto';
 import { VerifyOtpDto } from '../DTO/verify-otp.dto';
+import { ChangePasswordDto } from '../DTO/change-password.dto';
 import { UpdateProfileDto } from '../DTO/update-profile.dto';
 import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -33,6 +34,21 @@ export class UsersController {
         return this.userService.verifyOtp(dto.email, dto.otp);
     }
 
+    @Put('change-password')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiResponse({ status: 200, description: 'Change password successfully' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    changePassword(@Request() req, @Body() body: ChangePasswordDto) {
+
+        return this.userService.changePassword(
+            req.user.userId,
+            body.newPassword,
+            body.confirmPassword,
+            body.deviceInfo
+        );
+    }
+
     @Get('profile')
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth('JWT-auth')
@@ -60,4 +76,11 @@ export class UsersController {
     async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
         return this.userService.updateUserProfile(req.user.userId, updateProfileDto);
     }
+    @UseGuards(JwtAuthGuard)
+    @Delete('/account')
+    async deleteAccount(@Req() req) {
+        const userId = req.user.userId;
+    await this.userService.deleteAccount(userId);
+    return { message: "Your account has been deleted successfully!" };
+}
 }

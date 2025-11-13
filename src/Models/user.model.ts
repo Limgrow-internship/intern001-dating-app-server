@@ -45,6 +45,12 @@ export class User {
     @Prop({ type: [String], default: [] })
     deviceTokens: string[];
 
+    @Prop({ type: Array, default: [] })
+    passwordHistory: Array<{
+        changedAt: Date;
+        device: string;
+    }>;
+
     @Prop()
     firstName?: string;
 
@@ -68,6 +74,9 @@ export class User {
 
     @Prop()
     location?: string;
+
+    @Prop()
+    mode?: string;
 
     @Prop({ type: Number, min: 18, max: 100 })
     age?: number;
