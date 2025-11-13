@@ -2,6 +2,7 @@ import { Body, Controller, Post, Get, Put, UseGuards, Request, Delete, Req } fro
 import { UserService } from '../Services/user.service';
 import { CreateUserDto } from '../DTO/create-user.dto';
 import { VerifyOtpDto } from '../DTO/verify-otp.dto';
+import { ChangePasswordDto } from '../DTO/change-password.dto';
 import { UpdateProfileDto } from '../DTO/update-profile.dto';
 import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -19,6 +20,21 @@ export class UsersController {
     @Post('verify-otp')
     async verifyOtp(@Body() dto: VerifyOtpDto) {
         return this.userService.verifyOtp(dto.email, dto.otp);
+    }
+
+    @Put('change-password')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiResponse({ status: 200, description: 'Change password successfully' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    changePassword(@Request() req, @Body() body: ChangePasswordDto) {
+
+        return this.userService.changePassword(
+            req.user.userId,
+            body.newPassword,
+            body.confirmPassword,
+            body.deviceInfo
+        );
     }
 
     @Get('profile')
