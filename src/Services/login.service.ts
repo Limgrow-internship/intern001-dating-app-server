@@ -1,5 +1,4 @@
 // auth.service.ts
-
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { JwtService } from '@nestjs/jwt';
@@ -8,6 +7,7 @@ import { User, UserDocument } from '../Models/user.model';
 import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
 import { UserService } from '../Services/user.service';
+import { Profile, ProfileDocument } from '../Models/profile.model';
 
 @Injectable()
 export class AuthService {
@@ -15,6 +15,7 @@ export class AuthService {
 
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Profile.name) private profileModel: Model<ProfileDocument>,
     private jwt: JwtService,
     private userService: UserService,
     private jwtService: JwtService,
@@ -74,36 +75,29 @@ export class AuthService {
     const [firstName, ...rest] = name.split(' ');
     const lastName = rest.join(' ');
 
-    // Tạo hoặc update user
     const user = await this.userModel.findOneAndUpdate(
       { email },
       {
-        $setOnInsert: {
-          email,
-          'socialAccounts.google': { id: sub, email, name },
-        },
-        $addToSet: {
-          authMethods: 'google',
-        },
+        $setOnInsert: { email, 'socialAccounts.google': { id: sub, email, name } },
+        $addToSet: { authMethods: 'google' },
       },
       { new: true, upsert: true },
     );
 
-    // Nếu user mới, tạo profile
-    const profileExists = await this.profileModel.findOne({ userId: user.id });
-    if (!profileExists) {
-      await this.profileModel.create({
-        userId: user._id,
-        firstName,
-        lastName,
-      });
-    }
+    await this.profileModel.findOneAndUpdate(
+      { userId: user._id },
+      {
+        $set: { firstName, lastName },
+        $addToSet: { authMethods: 'google' },
+      },
+      { upsert: true, new: true },
+    );
 
-    // Tạo JWT
     const accessToken = await this.jwtService.signAsync(
       { sub: user.id.toString(), email: user.email },
       { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '15m' },
     );
+
     const refreshToken = await this.jwtService.signAsync(
       { sub: user.id.toString(), email: user.email },
       { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' },
