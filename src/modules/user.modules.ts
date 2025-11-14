@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { User, UserSchema } from '../Models/user.model';
+import { Profile, ProfileSchema } from '../Models/profile.model';
 import { UserService } from '../Services/user.service';
 import { UsersController } from '../Controllers/user.controller';
 import { EmailVerification, EmailVerificationSchema } from '../Models/email-verification.model';
@@ -12,6 +13,7 @@ import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
   imports: [
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
+      { name: Profile.name, schema: ProfileSchema },
       { name: EmailVerification.name, schema: EmailVerificationSchema }
     ]),
     JwtModule.register({

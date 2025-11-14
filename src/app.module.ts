@@ -5,6 +5,7 @@ import { databaseConfig } from './config/database.config';
 
 import { AuthModule } from './modules/auth.modules';
 import { UserModule } from './modules/user.modules';
+import { ProfileModule } from './modules/profile.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { UserModule } from './modules/user.modules';
 
     AuthModule,
     UserModule,
+    ProfileModule,
   ],
 })
 export class AppModule { }
