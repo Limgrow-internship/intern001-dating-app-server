@@ -67,37 +67,43 @@ export class AuthService {
     const payload = ticket.getPayload();
     if (!payload) throw new UnauthorizedException('Invalid Google token');
 
-    const { email, name, picture, sub } = payload;
-
-    if (!email) throw new UnauthorizedException('Email not found in Google token');
-    if (!name) throw new UnauthorizedException('Name not found in Google token');
+    const { email, name, sub } = payload;
+    if (!email) throw new UnauthorizedException("Email not found in Google token");
+    if (!name) throw new UnauthorizedException("Name not found in Google token");
 
     const [firstName, ...rest] = name.split(' ');
     const lastName = rest.join(' ');
 
+    // Tạo hoặc update user
     const user = await this.userModel.findOneAndUpdate(
       { email },
       {
-        $set: {
+        $setOnInsert: {
           email,
-          firstName,
-          lastName,
-          'socialAccounts.google': {
-            id: sub,
-            email,
-            name,
-            avatar: picture,
-          },
+          'socialAccounts.google': { id: sub, email, name },
+        },
+        $addToSet: {
+          authMethods: 'google',
         },
       },
       { new: true, upsert: true },
     );
 
+    // Nếu user mới, tạo profile
+    const profileExists = await this.profileModel.findOne({ userId: user.id });
+    if (!profileExists) {
+      await this.profileModel.create({
+        userId: user._id,
+        firstName,
+        lastName,
+      });
+    }
+
+    // Tạo JWT
     const accessToken = await this.jwtService.signAsync(
       { sub: user.id.toString(), email: user.email },
       { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '15m' },
     );
-
     const refreshToken = await this.jwtService.signAsync(
       { sub: user.id.toString(), email: user.email },
       { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' },
