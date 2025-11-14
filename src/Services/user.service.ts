@@ -194,7 +194,7 @@ export class UserService {
 
     async deleteAccount(userId: string): Promise<void> {
         await this.userModel.deleteOne({ id: userId });
-}
+    }
     async changePassword(
         userId: string,
         newPassword: string,
@@ -247,5 +247,14 @@ export class UserService {
             console.error('Error changing password:', error);
             throw new InternalServerErrorException('An error occurred, please try again');
         }
+    }
+
+    async findByEmail(email: string): Promise<UserDocument | null> {
+        return this.userModel.findOne({ email }).exec();
+    }
+
+    async create(userData: Partial<User>): Promise<UserDocument> {
+        const newUser = new this.userModel(userData);
+        return newUser.save();
     }
 }
