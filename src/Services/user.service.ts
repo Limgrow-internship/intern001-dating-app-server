@@ -6,7 +6,6 @@ import * as nodemailer from 'nodemailer';
 import { EmailVerification, EmailVerificationDocument } from '../Models/email-verification.model';
 import { User, UserDocument } from '../Models/user.model';
 import { Profile, ProfileDocument } from '../Models/profile.model';
-import { UpdateProfileDto } from '../DTO/update-profile.dto';
 
 @Injectable()
 export class UserService {
@@ -174,6 +173,10 @@ export class UserService {
         }
     }
 
+    /**
+     * Get User Authentication Info (not profile data)
+     * For profile data, use ProfileService
+     */
     async getUserProfile(userId: string) {
         const user = await this.userModel.findOne({ id: userId }).select('-password -otp -otpExpires -otpAttempts');
 
@@ -182,21 +185,5 @@ export class UserService {
         }
 
         return user;
-    }
-
-    async updateUserProfile(userId: string, updateProfileDto: UpdateProfileDto) {
-        const user = await this.userModel.findOne({ id: userId });
-
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
-
-        const updatedUser = await this.userModel.findOneAndUpdate(
-            { id: userId },
-            { $set: updateProfileDto },
-            { new: true }
-        ).select('-password -otp -otpExpires -otpAttempts');
-
-        return updatedUser;
     }
 }
