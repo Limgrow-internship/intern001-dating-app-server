@@ -37,10 +37,18 @@ export class ProfileService {
     }
 
     async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
-        const profile = await this.profileModel.findOne({ userId });
+        let profile = await this.profileModel.findOne({ userId });
 
+        // Auto-create profile if not exists (for users who signed up before profile feature)
         if (!profile) {
-            throw new NotFoundException('Profile not found');
+            console.log(`Profile not found for userId: ${userId}, creating new profile...`);
+            profile = new this.profileModel({
+                userId,
+                interests: [],
+                mode: 'dating',
+            });
+            await profile.save();
+            console.log(`New profile created for userId: ${userId}`);
         }
 
         const updatedProfile = await this.profileModel.findOneAndUpdate(

@@ -38,11 +38,10 @@ export class UpdateProfileDto {
     @IsOptional()
     @IsString()
     @Transform(({ value, obj }) => {
-        // If profileImageUrl is provided, map it to profilePicture
         if (value && !obj.profilePicture) {
             obj.profilePicture = value;
         }
-        return undefined; // Remove this field after transformation
+        return undefined;
     })
     profileImageUrl?: string;
 
@@ -56,11 +55,6 @@ export class UpdateProfileDto {
     @IsOptional()
     @IsString()
     location?: string;
-
-    @ApiPropertyOptional({ description: 'Mode of the user' })
-    @IsOptional()
-    @IsString()
-    mode?: string;
 
     @ApiPropertyOptional({ description: 'Age of the user (18-100)', minimum: 18, maximum: 100 })
     @IsOptional()

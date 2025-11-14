@@ -6,7 +6,6 @@ import * as nodemailer from 'nodemailer';
 import { EmailVerification, EmailVerificationDocument } from '../Models/email-verification.model';
 import { User, UserDocument } from '../Models/user.model';
 import { Profile, ProfileDocument } from '../Models/profile.model';
-import { UpdateProfileDto } from '../DTO/update-profile.dto';
 
 @Injectable()
 export class UserService {
@@ -150,8 +149,17 @@ export class UserService {
             try {
                 await newUser.save();
                 console.log('User created successfully:', record.email);
+
+                // Automatically create profile for the new user
+                const newProfile = new this.profileModel({
+                    userId: newUser.id,
+                    interests: [],
+                    mode: 'dating',
+                });
+                await newProfile.save();
+                console.log('Profile created successfully for user:', newUser.id);
             } catch (saveErr) {
-                console.error('Error saving user:', saveErr);
+                console.error('Error saving user or profile:', saveErr);
                 throw new InternalServerErrorException('Database error while creating user.');
             }
 
@@ -169,6 +177,10 @@ export class UserService {
         }
     }
 
+    /**
+     * Get User Authentication Info (not profile data)
+     * For profile data, use ProfileService
+     */
     async getUserProfile(userId: string) {
         const user = await this.userModel.findOne({ id: userId }).select('-password -otp -otpExpires -otpAttempts');
 
@@ -179,25 +191,9 @@ export class UserService {
         return user;
     }
 
-    async updateUserProfile(userId: string, updateProfileDto: UpdateProfileDto) {
-        const user = await this.userModel.findOne({ id: userId });
-
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
-
-        const updatedUser = await this.userModel.findOneAndUpdate(
-            { id: userId },
-            { $set: updateProfileDto },
-            { new: true }
-        ).select('-password -otp -otpExpires -otpAttempts');
-
-        return updatedUser;
-    }
-
     async deleteAccount(userId: string): Promise<void> {
         await this.userModel.deleteOne({ id: userId });
-}
+    }
     async changePassword(
         userId: string,
         newPassword: string,

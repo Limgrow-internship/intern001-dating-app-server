@@ -3,7 +3,6 @@ import { UserService } from '../Services/user.service';
 import { CreateUserDto } from '../DTO/create-user.dto';
 import { VerifyOtpDto } from '../DTO/verify-otp.dto';
 import { ChangePasswordDto } from '../DTO/change-password.dto';
-import { UpdateProfileDto } from '../DTO/update-profile.dto';
 import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
@@ -49,38 +48,24 @@ export class UsersController {
         );
     }
 
-    @Get('profile')
+    @Get('info')
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
-        summary: '4️⃣ Get User Profile (from User table)',
-        description: '🔒 Requires JWT token. Click "Authorize" button and paste token from login.'
+        summary: '4️⃣ Get User Auth Info (email, status, etc.)',
+        description: '🔒 Requires JWT token. Returns authentication-related info only (not profile data). For profile data, use /api/profile endpoint.'
     })
-    @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
+    @ApiResponse({ status: 200, description: 'User auth info retrieved successfully' })
     @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
     @ApiResponse({ status: 404, description: 'User not found' })
     async getProfile(@Request() req) {
         return this.userService.getUserProfile(req.user.userId);
     }
-
-    @Put('profile')
-    @UseGuards(JwtAuthGuard)
-    @ApiBearerAuth('JWT-auth')
-    @ApiOperation({
-        summary: '5️⃣ Update User Profile (in User table)',
-        description: '🔒 Requires JWT token. Update user profile information in User collection.'
-    })
-    @ApiResponse({ status: 200, description: 'Profile updated successfully' })
-    @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
-    @ApiResponse({ status: 404, description: 'User not found' })
-    async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
-        return this.userService.updateUserProfile(req.user.userId, updateProfileDto);
-    }
     @UseGuards(JwtAuthGuard)
     @Delete('/account')
     async deleteAccount(@Req() req) {
         const userId = req.user.userId;
-    await this.userService.deleteAccount(userId);
-    return { message: "Your account has been deleted successfully!" };
-}
+        await this.userService.deleteAccount(userId);
+        return { message: "Your account has been deleted successfully!" };
+    }
 }

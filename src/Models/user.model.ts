@@ -50,39 +50,6 @@ export class User {
         changedAt: Date;
         device: string;
     }>;
-
-    @Prop()
-    firstName?: string;
-
-    @Prop()
-    lastName?: string;
-
-    @Prop()
-    dateOfBirth?: Date;
-
-    @Prop()
-    gender?: string;
-
-    @Prop()
-    bio?: string;
-
-    @Prop()
-    profilePicture?: string;
-
-    @Prop({ type: [String], default: [] })
-    interests: string[];
-
-    @Prop()
-    location?: string;
-
-    @Prop()
-    mode?: string;
-
-    @Prop({ type: Number, min: 18, max: 100 })
-    age?: number;
-
-    @Prop({ type: String, enum: ['dating', 'friend'], default: 'dating' })
-    mode?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
