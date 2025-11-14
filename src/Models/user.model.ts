@@ -44,6 +44,12 @@ export class User {
 
     @Prop({ type: [String], default: [] })
     deviceTokens: string[];
+
+    @Prop({ type: Array, default: [] })
+    passwordHistory: Array<{
+        changedAt: Date;
+        device: string;
+    }>;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

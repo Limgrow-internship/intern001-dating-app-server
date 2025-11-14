@@ -12,7 +12,6 @@ import { ProfileModule } from './modules/profile.module';
     ConfigModule.forRoot({ isGlobal: true }),
     MongooseModule.forRootAsync({ useFactory: databaseConfig }),
 
-    //✅ Import 3 module chính
     AuthModule,
     UserModule,
     ProfileModule,

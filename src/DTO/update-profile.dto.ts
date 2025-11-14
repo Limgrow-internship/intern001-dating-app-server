@@ -38,11 +38,10 @@ export class UpdateProfileDto {
     @IsOptional()
     @IsString()
     @Transform(({ value, obj }) => {
-        // If profileImageUrl is provided, map it to profilePicture
         if (value && !obj.profilePicture) {
             obj.profilePicture = value;
         }
-        return undefined; // Remove this field after transformation
+        return undefined;
     })
     profileImageUrl?: string;
 
