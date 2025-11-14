@@ -30,17 +30,17 @@ export class AuthService {
     }
 
     const accessToken = this.jwt.sign(
-      { id: user._id, email: user.email },
+      { userId: user.id, email: user.email },
       { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '15m' }
     );
 
     const refreshToken = this.jwt.sign(
-      { id: user._id, email: user.email },
+      { userId: user.id, email: user.email },
       { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' }
     );
 
     const userInfo = {
-      id: user._id,
+      id: user.id,
       email: user.email
     };
 
@@ -50,5 +50,36 @@ export class AuthService {
       refreshToken,
       message: 'Đăng nhập thành công'
     };
+  }
+
+  async refresh(refreshToken: string) {
+    try {
+      const payload = this.jwt.verify(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET
+      });
+
+      const user = await this.userModel.findOne({ id: payload.userId }).exec();
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      const newAccessToken = this.jwt.sign(
+        { userId: user.id, email: user.email },
+        { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '15m' }
+      );
+
+      const newRefreshToken = this.jwt.sign(
+        { userId: user.id, email: user.email },
+        { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' }
+      );
+
+      return {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        message: 'Token refreshed successfully'
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
   }
 }

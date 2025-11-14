@@ -1,10 +1,11 @@
-import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer';
 import { EmailVerification, EmailVerificationDocument } from '../Models/email-verification.model';
 import { User, UserDocument } from '../Models/user.model';
+import { Profile, ProfileDocument } from '../Models/profile.model';
 
 @Injectable()
 export class UserService {
@@ -13,6 +14,8 @@ export class UserService {
         private emailVerifyModel: Model<EmailVerificationDocument>,
         @InjectModel(User.name)
         private userModel: Model<UserDocument>,
+        @InjectModel(Profile.name)
+        private profileModel: Model<ProfileDocument>,
     ) { }
 
     async requestOtp(email: string, password: string) {
@@ -35,15 +38,19 @@ export class UserService {
             }
 
             if (existingRecord.resendCount >= 5) {
-                if (existingRecord.lockedUntil && existingRecord.lockedUntil > now) {
+                const now = new Date();
+
+                if (existingRecord.lockedUntil && existingRecord.lockedUntil.getTime() > now.getTime()) {
                     const minutesLeft = Math.ceil((existingRecord.lockedUntil.getTime() - now.getTime()) / 60000);
                     throw new BadRequestException(`Too many OTP requests. Try again after ${minutesLeft} minutes`);
                 } else {
-                    existingRecord.lockedUntil = new Date(now.getTime() + 15 * 60 * 1000);
+                    existingRecord.resendCount = 0;
+                    existingRecord.lockedUntil = null;
                     await existingRecord.save();
-                    throw new BadRequestException('Too many OTP requests. You are locked for 15 minutes.');
                 }
+
             }
+
         }
 
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
@@ -80,7 +87,7 @@ export class UserService {
                 text: `Your OTP code is: ${otp}. It will expire in 90 seconds.`,
             });
         } catch (err) {
-            console.error('❌ Email send failed:', err);
+            console.error('Email send failed:', err);
             throw new InternalServerErrorException('Unable to send OTP email. Please check your email settings.');
         }
 
@@ -88,35 +95,156 @@ export class UserService {
     }
 
     async verifyOtp(email: string, otp: string) {
-        const record = await this.emailVerifyModel.findOne({ email });
-        if (!record) throw new BadRequestException('No OTP request found for this email.');
+        try {
+            console.log('Verify OTP called with:', { email, otp });
 
-        if (record.otpExpiresAt.getTime() < Date.now()) {
-            await this.emailVerifyModel.deleteOne({ email });
-            throw new BadRequestException('OTP has expired. Please request a new one.');
-        }
-
-        if (record.otp !== otp) {
-            record.attempts += 1;
-            await record.save();
-
-            if (record.attempts >= 3) {
-                await this.emailVerifyModel.deleteOne({ email });
-                throw new BadRequestException('Too many incorrect attempts. Please register again.');
+            const record = await this.emailVerifyModel.findOne({ email });
+            if (!record) {
+                console.warn('No OTP record found for email:', email);
+                throw new BadRequestException('No OTP request found for this email.');
             }
 
-            throw new BadRequestException('Incorrect OTP. Please try again.');
+            console.log('OTP record found:', {
+                email: record.email,
+                otp: record.otp,
+                otpExpiresAt: record.otpExpiresAt,
+                attempts: record.attempts,
+                passwordExists: !!record.password,
+            });
+
+            if (!record.otpExpiresAt) {
+                console.error('Missing otpExpiresAt in record for:', email);
+                await this.emailVerifyModel.deleteOne({ email });
+                throw new BadRequestException('Invalid OTP record. Please request a new OTP.');
+            }
+
+            if (record.otpExpiresAt.getTime() < Date.now()) {
+                console.warn('OTP expired for:', email);
+                await this.emailVerifyModel.deleteOne({ email });
+                throw new BadRequestException('OTP has expired. Please request a new one.');
+            }
+
+            if (record.otp !== otp) {
+                record.attempts += 1;
+                await record.save();
+
+                console.warn(`Incorrect OTP for ${email}. Attempt ${record.attempts}/3`);
+
+                if (record.attempts >= 3) {
+                    await this.emailVerifyModel.deleteOne({ email });
+                    throw new BadRequestException('Too many incorrect attempts. Please register again.');
+                }
+
+                throw new BadRequestException('Incorrect OTP. Please try again.');
+            }
+
+            console.log('OTP verified successfully, creating user...');
+
+            const newUser = new this.userModel({
+                email: record.email,
+                password: record.password,
+                status: 'active',
+            });
+
+            try {
+                await newUser.save();
+                console.log('User created successfully:', record.email);
+
+                // Automatically create profile for the new user
+                const newProfile = new this.profileModel({
+                    userId: newUser.id,
+                    interests: [],
+                    mode: 'dating',
+                });
+                await newProfile.save();
+                console.log('Profile created successfully for user:', newUser.id);
+            } catch (saveErr) {
+                console.error('Error saving user or profile:', saveErr);
+                throw new InternalServerErrorException('Database error while creating user.');
+            }
+
+            await this.emailVerifyModel.deleteOne({ email });
+            console.log('Deleted email verification record for:', email);
+
+            return { message: 'Verification successful. Account created.' };
+
+        } catch (err) {
+            console.error('verifyOtp() error:', err);
+            if (err instanceof BadRequestException || err instanceof InternalServerErrorException) {
+                throw err;
+            }
+            throw new InternalServerErrorException('Unexpected error while verifying OTP.');
+        }
+    }
+
+    /**
+     * Get User Authentication Info (not profile data)
+     * For profile data, use ProfileService
+     */
+    async getUserProfile(userId: string) {
+        const user = await this.userModel.findOne({ id: userId }).select('-password -otp -otpExpires -otpAttempts');
+
+        if (!user) {
+            throw new NotFoundException('User not found');
         }
 
-        const newUser = new this.userModel({
-            email: record.email,
-            password: record.password,
-            status: 'active',
-        });
-        await newUser.save();
+        return user;
+    }
 
-        await this.emailVerifyModel.deleteOne({ email });
+    async deleteAccount(userId: string): Promise<void> {
+        await this.userModel.deleteOne({ id: userId });
+    }
+    async changePassword(
+        userId: string,
+        newPassword: string,
+        confirmPassword: string,
+        deviceInfo: string,
+    ) {
+        try {
+            const user = await this.userModel.findOne({ id: userId });
+            if (!user) {
+                throw new BadRequestException('User not found');
+            }
 
-        return { message: 'Verification successful. Account created.' };
+            if (newPassword !== confirmPassword) {
+                throw new BadRequestException(
+                    'New password and confirmation password do not match'
+                );
+            }
+
+            if (newPassword.length < 8) {
+                throw new BadRequestException('New password is too short');
+            }
+
+            const sameAsOld = await bcrypt.compare(newPassword, user.password);
+            if (sameAsOld) {
+                throw new BadRequestException('New password cannot be the same as the old password');
+            }
+
+            const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+            user.password = hashedNewPassword;
+
+            user.deviceTokens = [];
+
+            user.passwordHistory.push({
+                changedAt: new Date(),
+                device: deviceInfo,
+            });
+
+            await user.save();
+
+            return { message: 'Password changed successfully' };
+
+        } catch (error) {
+            if (error instanceof BadRequestException) {
+                throw error;
+            }
+            if (error.name === 'MongoNetworkError' || error.name === 'MongooseServerSelectionError') {
+                throw new InternalServerErrorException('Cannot connect to server');
+            }
+
+            console.error('Error changing password:', error);
+            throw new InternalServerErrorException('An error occurred, please try again');
+        }
     }
 }
