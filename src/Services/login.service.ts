@@ -24,6 +24,10 @@ export class AuthService {
       throw new UnauthorizedException('Email không tồn tại');
     }
 
+    if (!user.password) {
+      throw new UnauthorizedException('User password not found');
+    }
+
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
       throw new UnauthorizedException('Mật khẩu không đúng');
