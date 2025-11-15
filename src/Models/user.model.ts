@@ -15,13 +15,8 @@ export class User {
     @Prop({ unique: true, sparse: true })
     phoneNumber?: string;
 
-    @Prop({ unique: true, sparse: true })
-    facebookId?: string;
-
-    @Prop({
-    required: function (this: any) {
-    return !this.facebookId;}})
-    password?: string;
+    @Prop({ required: true })
+    password: string;
 
     @Prop()
     otp?: string;
