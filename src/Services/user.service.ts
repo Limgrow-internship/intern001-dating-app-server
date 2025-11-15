@@ -72,6 +72,10 @@ export class UserService {
         );
 
         try {
+            if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
+                throw new InternalServerErrorException('Email configuration is missing. Please check environment variables.');
+            }
+
             const transporter = nodemailer.createTransport({
                 service: 'gmail',
                 auth: {
@@ -204,6 +208,10 @@ export class UserService {
             const user = await this.userModel.findOne({ id: userId });
             if (!user) {
                 throw new BadRequestException('User not found');
+            }
+
+            if (!user.password) {
+                throw new BadRequestException('User password not found');
             }
 
             if (newPassword !== confirmPassword) {
