@@ -4,6 +4,7 @@ import { Login } from '../DTO/login.dto';
 import { RefreshTokenDto } from '../DTO/refresh.dto';
 import { HttpCode } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { FacebookLoginDto } from 'src/DTO/facebook-login.dto';
 
 
 @ApiTags('Auth')
@@ -39,5 +40,18 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
   refresh(@Body() body: RefreshTokenDto) {
     return this.auth.refresh(body.refreshToken);
+  }
+
+  @Post('facebook-login')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Login or signup with Facebook OAuth' })
+  @ApiResponse({
+    status: 200,
+    description: 'Facebook login success, returns JWT token.',
+    schema: { example: { accessToken: '...', refreshToken: '...' } }
+  })
+  @ApiResponse({ status: 401, description: 'Invalid Facebook token' })
+  facebookLogin(@Body() body: FacebookLoginDto) {
+    return this.auth.facebookLogin(body.accessToken);
   }
 }
