@@ -8,14 +8,16 @@ import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
 import { UserService } from '../Services/user.service';
 import { Profile, ProfileDocument } from '../Models/profile.model';
+import axios from 'axios';
 
 @Injectable()
 export class AuthService {
-  private client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  private googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Profile.name) private profileModel: Model<ProfileDocument>,
+
     private jwt: JwtService,
     private userService: UserService,
     private jwtService: JwtService,
@@ -59,51 +61,102 @@ export class AuthService {
     };
   }
 
-  async verifyGoogleToken(idToken: string) {
-    const ticket = await this.client.verifyIdToken({
-      idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+  async googleLogin(idToken: string) {
+    let payload;
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+      console.log("[GoogleLogin] payload:", payload);
+      if (!payload) throw new UnauthorizedException('Invalid Google token');
+    } catch (err) {
+      console.error("[GoogleLogin] verifyIdToken error:", err);
+      throw new UnauthorizedException('Invalid Google token');
+    }
 
-    const payload = ticket.getPayload();
-    if (!payload) throw new UnauthorizedException('Invalid Google token');
 
-    const { email, name, sub } = payload;
-    if (!email) throw new UnauthorizedException("Email not found in Google token");
-    if (!name) throw new UnauthorizedException("Name not found in Google token");
+    // payload.sub = googleId
+    const googleId = payload.sub;
+    const email = payload.email;
+    const name = payload.name || '';
+    const picture = payload.picture || null;
 
-    const [firstName, ...rest] = name.split(' ');
-    const lastName = rest.join(' ');
+    // Tách firstName / lastName
+    let firstName = '';
+    let lastName = '';
+    if (name) {
+      const parts = name.split(' ');
+      firstName = parts[0];
+      lastName = parts.slice(1).join(' ');
+    }
 
-    const user = await this.userModel.findOneAndUpdate(
-      { email },
-      {
-        $setOnInsert: { email, 'socialAccounts.google': { id: sub, email, name } },
-        $addToSet: { authMethods: 'google' },
-      },
-      { new: true, upsert: true },
-    );
+    // Tìm user theo googleId hoặc email
+    let user = await this.userModel.findOne({ googleId }).exec();
+    if (!user && email) {
+      user = await this.userModel.findOne({ email }).exec();
+    }
 
-    await this.profileModel.findOneAndUpdate(
-      { userId: user._id },
-      {
-        $set: { firstName, lastName },
-        $addToSet: { authMethods: 'google' },
-      },
-      { upsert: true, new: true },
-    );
+    let isNewUser = false;
 
-    const accessToken = await this.jwtService.signAsync(
-      { sub: user.id.toString(), email: user.email },
+    // Nếu chưa có user → tạo mới
+    if (!user) {
+      user = await this.userModel.create({
+        googleId,
+        email: email || `google_${googleId}@gmail.com`,
+        authMethods: ['google'],
+        status: 'active',
+      });
+      isNewUser = true;
+    }
+
+    // Tạo / cập nhật profile
+    if (isNewUser) {
+      await this.profileModel.create({
+        userId: user.id,
+        firstName,
+        lastName,
+        profilePicture: picture,
+      });
+    } else {
+      const updateResult = await this.profileModel.updateOne(
+        { userId: user.id },
+        { $set: { firstName, lastName, profilePicture: picture } },
+        { upsert: true },
+      );
+      console.log("[GoogleLogin] profile update result:", updateResult);
+    }
+
+    const profile = await this.profileModel.findOne({ userId: user.id }).exec();
+
+    // Tạo JWT
+    const accessTokenJwt = this.jwt.sign(
+      { userId: user.id, email: user.email },
       { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '15m' },
     );
 
-    const refreshToken = await this.jwtService.signAsync(
-      { sub: user.id.toString(), email: user.email },
+    const refreshTokenJwt = this.jwt.sign(
+      { userId: user.id, email: user.email },
       { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' },
     );
 
-    return { accessToken, refreshToken, user };
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+      profile: profile
+        ? {
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          profilePicture: profile.profilePicture,
+        }
+        : {},
+      accessToken: accessTokenJwt,
+      refreshToken: refreshTokenJwt,
+      message: 'Login with Google successfully!',
+    };
   }
 
   async refresh(refreshToken: string) {

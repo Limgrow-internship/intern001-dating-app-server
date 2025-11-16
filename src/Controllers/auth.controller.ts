@@ -33,16 +33,17 @@ export class AuthController {
     return this.auth.login(body.email, body.password);
   }
 
-  @Post('google')
-  async loginWithGoogle(@Body() body: { idToken: string }) {
-    const result = await this.auth.verifyGoogleToken(body.idToken);
-
-    return {
-      message: 'Login successful',
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      user: result.user,
-    };
+  @Post('google-login')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Login or signup with Google OAuth' })
+  @ApiResponse({
+    status: 200,
+    description: 'Google login success, returns JWT token.',
+    schema: { example: { accessToken: '...', refreshToken: '...' } }
+  })
+  @ApiResponse({ status: 401, description: 'Invalid Google token' })
+  googleLogin(@Body() body: LoginWithGoogleDto) {
+    return this.auth.googleLogin(body.accessToken);
   }
 
   @Post('refresh')
