@@ -76,14 +76,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid Google token');
     }
 
-
-    // payload.sub = googleId
     const googleId = payload.sub;
     const email = payload.email;
     const name = payload.name || '';
     const picture = payload.picture || null;
 
-    // Tách firstName / lastName
     let firstName = '';
     let lastName = '';
     if (name) {
@@ -92,7 +89,6 @@ export class AuthService {
       lastName = parts.slice(1).join(' ');
     }
 
-    // Tìm user theo googleId hoặc email
     let user = await this.userModel.findOne({ googleId }).exec();
     if (!user && email) {
       user = await this.userModel.findOne({ email }).exec();
@@ -100,7 +96,6 @@ export class AuthService {
 
     let isNewUser = false;
 
-    // Nếu chưa có user → tạo mới
     if (!user) {
       user = await this.userModel.create({
         googleId,
@@ -111,7 +106,6 @@ export class AuthService {
       isNewUser = true;
     }
 
-    // Tạo / cập nhật profile
     if (isNewUser) {
       await this.profileModel.create({
         userId: user.id,
@@ -130,7 +124,6 @@ export class AuthService {
 
     const profile = await this.profileModel.findOne({ userId: user.id }).exec();
 
-    // Tạo JWT
     const accessTokenJwt = this.jwt.sign(
       { userId: user.id, email: user.email },
       { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '15m' },
