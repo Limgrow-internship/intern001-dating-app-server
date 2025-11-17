@@ -61,6 +61,7 @@ export class UsersController {
     async getProfile(@Request() req) {
         return this.userService.getUserProfile(req.user.userId);
     }
+
     @UseGuards(JwtAuthGuard)
     @Delete('/account')
     async deleteAccount(@Req() req) {

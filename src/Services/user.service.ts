@@ -255,4 +255,13 @@ export class UserService {
             throw new InternalServerErrorException('An error occurred, please try again');
         }
     }
+
+    async findByEmail(email: string): Promise<UserDocument | null> {
+        return this.userModel.findOne({ email }).exec();
+    }
+
+    async create(userData: Partial<User>): Promise<UserDocument> {
+        const newUser = new this.userModel(userData);
+        return newUser.save();
+    }
 }
