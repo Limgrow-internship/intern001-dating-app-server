@@ -15,8 +15,15 @@ export class User {
     @Prop({ unique: true, sparse: true })
     phoneNumber?: string;
 
-    @Prop({ required: true })
-    password: string;
+    @Prop({ unique: true, sparse: true })
+    googleId?: string;
+
+    @Prop({
+        required: function (this: any) {
+            return !this.googleId;
+        }
+    })
+    password?: string;
 
     @Prop()
     otp?: string;
