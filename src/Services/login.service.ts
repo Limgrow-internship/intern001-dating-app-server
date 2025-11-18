@@ -155,7 +155,90 @@ export class AuthService {
       message: 'Login with Google successfully!',
     };
   }
+  async facebookLogin(accessToken: string) {
+    let fbRes: any = null;
+    try {
+      fbRes = await axios.get('https://graph.facebook.com/me', {
+        params: {
+          access_token: accessToken,
+          fields: 'id,email,name,picture'
+        }
+      });
+    } catch {
+      fbRes = null;
+    }
 
+    if (!fbRes || !fbRes.data || !fbRes.data.id) {
+      throw new UnauthorizedException('Invalid Facebook token');
+    }
+    const fbData = fbRes.data;
+
+    let firstName = '';
+    let lastName = '';
+    if (fbData.name) {
+      const parts = fbData.name.split(' ');
+      firstName = parts[0];
+      lastName = parts.slice(1).join(' ');
+    }
+
+    let user = await this.userModel.findOne({ facebookId: fbData.id }).exec();
+    if (!user && fbData.email) {
+      user = await this.userModel.findOne({ email: fbData.email }).exec();
+    }
+    let isNewUser = false;
+    if (!user) {
+      user = await this.userModel.create({
+        facebookId: fbData.id,
+        email: fbData.email || `${fbData.id}@facebook.com`, 
+        authMethods: ['facebook'],
+        status: 'active'
+      });
+      isNewUser = true;
+    }
+
+    if (isNewUser) {
+      await this.profileModel.create({
+        userId: user.id,
+        firstName,
+        lastName,
+        // profilePicture: fbData.picture?.data?.url
+      });
+    } else {
+      await this.profileModel.updateOne(
+        { userId: user.id },
+        { $set: { firstName, lastName, 
+          // 
+           } },
+        { upsert: true }
+      );
+    }
+
+    const profile = await this.profileModel.findOne({ userId: user.id }).exec();
+
+    const accessTokenJwt = this.jwt.sign(
+      { userId: user.id, email: user.email },
+      { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '15m' }
+    );
+    const refreshTokenJwt = this.jwt.sign(
+      { userId: user.id, email: user.email },
+      { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' }
+    );
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email
+      },
+      profile: profile ? {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        // profilePicture: profile.profilePicture
+      } : {},
+      accessToken: accessTokenJwt,
+      refreshToken: refreshTokenJwt,
+      message: 'Login with Facebook thành công'
+    };
+  }
   async refresh(refreshToken: string) {
     try {
       const payload = this.jwt.verify(refreshToken, {

@@ -16,12 +16,15 @@ export class User {
     phoneNumber?: string;
 
     @Prop({ unique: true, sparse: true })
+    facebookId?: string;
+
+    @Prop({ unique: true, sparse: true })
     googleId?: string;
 
     @Prop({
-        required: function (this: any) {
-            return !this.googleId;
-        }
+    required: function (this: any) {
+        return !this.googleId && !this.facebookId;
+    }
     })
     password?: string;
 
