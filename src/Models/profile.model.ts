@@ -37,6 +37,18 @@ export class Profile {
 
     @Prop({ type: String, enum: ['dating', 'friend'], default: 'dating' })
     mode?: string;
+
+    @Prop({ default: false })
+    isVerified?: boolean;
+
+    @Prop()
+    verifiedAt?: Date;
+
+    @Prop()
+    selfieImage?: string; 
+
+    @Prop({ default: false })
+    verifiedBadge?: boolean;
 }
 
 export const ProfileSchema = SchemaFactory.createForClass(Profile);
