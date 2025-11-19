@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { Profile, ProfileDocument } from '../Models/profile.model';
 import { Swipe, SwipeDocument } from '../Models/swipe.model';
 import { Preference, PreferenceDocument } from '../Models/preference.model';
+import { BlockedUser, BlockedUserDocument } from '../Models/blocked-user.model';
 
 interface ScoredProfile {
   profile: ProfileDocument;
@@ -23,6 +24,8 @@ export class RecommendationService {
     @InjectModel(Swipe.name) private swipeModel: Model<SwipeDocument>,
     @InjectModel(Preference.name)
     private preferenceModel: Model<PreferenceDocument>,
+    @InjectModel(BlockedUser.name)
+    private blockedUserModel: Model<BlockedUserDocument>,
   ) {}
 
   /**
@@ -32,6 +35,7 @@ export class RecommendationService {
   async getRecommendations(
     userId: string,
     limit: number = 10,
+    excludedUserIds?: string[],
   ): Promise<ScoredProfile[]> {
     // 1. Get user profile
     const userProfile = await this.profileModel.findOne({ userId });
@@ -47,9 +51,19 @@ export class RecommendationService {
       .find({ userId })
       .distinct('targetUserId');
 
+    // 3.5. Get blocked users (bi-directional)
+    const [blocked, blockedBy] = await Promise.all([
+      this.blockedUserModel.find({ blockerUserId: userId }).distinct('blockedUserId'),
+      this.blockedUserModel.find({ blockedUserId: userId }).distinct('blockerUserId'),
+    ]);
+    const blockedUserIds = [...blocked, ...blockedBy, ...(excludedUserIds || [])];
+
     // 4. Build filter query for candidates
     const filterQuery: any = {
-      userId: { $ne: userId, $nin: swipedUserIds },
+      userId: {
+        $ne: userId,
+        $nin: [...swipedUserIds, ...blockedUserIds],
+      },
       mode: preferences.mode,
     };
 
@@ -67,6 +81,19 @@ export class RecommendationService {
       preferences.genderPreference.length > 0
     ) {
       filterQuery.gender = { $in: preferences.genderPreference };
+    }
+
+    // Distance filter (geospatial query)
+    if (userProfile.location && userProfile.location.coordinates && preferences.maxDistance) {
+      filterQuery.location = {
+        $near: {
+          $geometry: {
+            type: 'Point',
+            coordinates: userProfile.location.coordinates, // [lng, lat]
+          },
+          $maxDistance: preferences.maxDistance * 1000, // Convert km to meters
+        },
+      };
     }
 
     // 5. Fetch candidate profiles

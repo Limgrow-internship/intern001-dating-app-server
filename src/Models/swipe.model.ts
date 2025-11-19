@@ -19,6 +19,9 @@ export class Swipe {
 
   @Prop({ type: Number })
   score?: number; // Recommendation score at time of swipe (for ML feedback)
+
+  @Prop({ type: Boolean, default: false })
+  isSuperLike?: boolean; // True if this was a super like
 }
 
 export const SwipeSchema = SchemaFactory.createForClass(Swipe);
