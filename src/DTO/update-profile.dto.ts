@@ -51,10 +51,15 @@ export class UpdateProfileDto {
     @IsString({ each: true })
     interests?: string[];
 
-    @ApiPropertyOptional({ description: 'Location of the user' })
+    @ApiPropertyOptional({
+        description: 'Location of the user - can be string (city name) or object with longitude and latitude',
+        oneOf: [
+            { type: 'string' },
+            { type: 'object', properties: { longitude: { type: 'number' }, latitude: { type: 'number' } } }
+        ]
+    })
     @IsOptional()
-    @IsString()
-    location?: string;
+    location?: string | { longitude: number; latitude: number };
 
     @ApiPropertyOptional({ description: 'Age of the user (18-100)', minimum: 18, maximum: 100 })
     @IsOptional()
@@ -73,4 +78,31 @@ export class UpdateProfileDto {
     })
     @IsIn(['dating', 'friend'])
     mode?: string;
+
+    @ApiPropertyOptional({ description: 'Occupation of the user' })
+    @IsOptional()
+    @IsString()
+    occupation?: string;
+
+    @ApiPropertyOptional({ description: 'Company name' })
+    @IsOptional()
+    @IsString()
+    company?: string;
+
+    @ApiPropertyOptional({ description: 'City' })
+    @IsOptional()
+    @IsString()
+    city?: string;
+
+    @ApiPropertyOptional({ description: 'Country' })
+    @IsOptional()
+    @IsString()
+    country?: string;
+
+    @ApiPropertyOptional({ description: 'Height in centimeters (120-220)', minimum: 120, maximum: 220 })
+    @IsOptional()
+    @IsNumber()
+    @Min(120)
+    @Max(220)
+    height?: number;
 }
