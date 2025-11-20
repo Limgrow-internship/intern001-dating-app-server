@@ -5,19 +5,19 @@ import { Profile, ProfileSchema } from '../Models/profile.model';
 import { ProfileService } from '../Services/profile.service';
 import { ProfileController } from '../Controllers/profile.controller';
 import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
+import { VerifyController } from '../Controllers/verify.controller';
+import { VerifyService } from '../Services/verify.service';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: Profile.name, schema: ProfileSchema }
-    ]),
+    MongooseModule.forFeature([{ name: Profile.name, schema: ProfileSchema }]),
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET,
       signOptions: { expiresIn: '15m' },
     }),
   ],
-  controllers: [ProfileController],
-  providers: [ProfileService, JwtAuthGuard],
-  exports: [ProfileService, MongooseModule]
+  controllers: [ProfileController, VerifyController],
+  providers: [ProfileService, JwtAuthGuard, VerifyService],
+  exports: [ProfileService, MongooseModule],
 })
 export class ProfileModule {}
