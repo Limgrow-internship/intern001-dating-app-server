@@ -105,4 +105,40 @@ export class UpdateProfileDto {
     @Min(120)
     @Max(220)
     height?: number;
+
+    @ApiPropertyOptional({ description: 'Weight in kilograms (30-300)', minimum: 30, maximum: 300 })
+    @IsOptional()
+    @IsNumber()
+    @Min(30)
+    @Max(300)
+    weight?: number;
+
+    @ApiPropertyOptional({ description: 'Goals/objectives' })
+    @IsOptional()
+    @IsString()
+    goals?: string;
+
+    @ApiPropertyOptional({ description: 'Job title' })
+    @IsOptional()
+    @IsString()
+    job?: string;
+
+    @ApiPropertyOptional({ description: 'Education level or institution' })
+    @IsOptional()
+    @IsString()
+    education?: string;
+
+    @ApiPropertyOptional({ description: 'Zodiac sign', enum: ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'] })
+    @IsOptional()
+    @IsString()
+    @IsIn(['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'])
+    zodiac?: string;
+
+    @ApiPropertyOptional({
+        description: 'Answers to open questions',
+        type: 'object',
+        additionalProperties: { type: 'string' }
+    })
+    @IsOptional()
+    openQuestionAnswers?: Record<string, string>;
 }
