@@ -5,7 +5,7 @@ import { JwtAuthGuard } from 'src/Guards/jwt-auth.guard';
 
 @Controller()
 export class VerifyController {
-  constructor(private readonly verifyService: VerifyService) {}
+  constructor(private readonly verifyService: VerifyService) { }
 
   @Post('verify-face')
   @UseGuards(JwtAuthGuard)
