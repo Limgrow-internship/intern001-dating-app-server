@@ -59,6 +59,15 @@ export class Profile {
     @Prop({ type: String, enum: ['dating', 'friend'], default: 'dating' })
     mode?: string;
 
+    @Prop()
+    verifiedAt?: Date;
+
+    @Prop()
+    selfieImage?: string; 
+
+    @Prop({ default: false })
+    verifiedBadge?: boolean;
+
     // New fields for Android compatibility
     @Prop()
     occupation?: string;
