@@ -51,9 +51,26 @@ export class ProfileService {
             console.log(`New profile created for userId: ${userId}`);
         }
 
+        // Prepare update data
+        const updateData: any = { ...updateProfileDto };
+
+        // Handle location field - convert to GeoJSON format if provided
+        if (updateProfileDto.location) {
+            if (typeof updateProfileDto.location === 'object' && 'longitude' in updateProfileDto.location && 'latitude' in updateProfileDto.location) {
+                // Convert { longitude, latitude } to GeoJSON format
+                updateData.location = {
+                    type: 'Point',
+                    coordinates: [updateProfileDto.location.longitude, updateProfileDto.location.latitude]
+                };
+            } else {
+                // If it's a string or invalid format, remove it from update to prevent geo index errors
+                delete updateData.location;
+            }
+        }
+
         const updatedProfile = await this.profileModel.findOneAndUpdate(
             { userId },
-            { $set: updateProfileDto },
+            { $set: updateData },
             { new: true }
         );
 
