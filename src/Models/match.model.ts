@@ -13,16 +13,19 @@ export class Match {
 
   @Prop({
     required: true,
-    enum: ['pending', 'matched', 'unmatched'],
-    default: 'matched',
+    enum: ['active', 'unmatched', 'blocked'],
+    default: 'active',
   })
   status: string;
 
-  @Prop({ type: Date })
+  @Prop({ type: Date, default: Date.now })
   matchedAt: Date; // When both users liked each other
 
   @Prop({ type: Date })
   unmatchedAt?: Date; // When either user unmatched
+
+  @Prop({ type: Date })
+  lastMessageAt?: Date; // Last message timestamp in conversation
 }
 
 export const MatchSchema = SchemaFactory.createForClass(Match);

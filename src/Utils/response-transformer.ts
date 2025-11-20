@@ -33,6 +33,9 @@ export class ResponseTransformer {
         )
       : null;
 
+    // Ensure photos array is not empty - use profilePicture as fallback
+    const photos = this.ensurePhotosArray(profile.photos, profile.profilePicture);
+
     return {
       id: (profile._id as any).toString(),
       userId: profile.userId,
@@ -41,8 +44,8 @@ export class ResponseTransformer {
       displayName: profile.displayName || `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || null,
       age: profile.age || null,
       gender: profile.gender || null,
-      avatar: profile.avatar || profile.photos?.[0] || null,
-      photos: this.transformPhotos(profile.photos),
+      avatar: profile.avatar || profile.profilePicture || photos?.[0]?.url || null,
+      photos,
       bio: profile.bio || null,
       distance,
       location: this.transformLocation(profile.location, profile.city, profile.country),
@@ -63,13 +66,16 @@ export class ResponseTransformer {
   static toUserProfileResponse(
     profile: ProfileDocument,
   ): UserProfileResponseDto {
+    // Ensure photos array is not empty - use profilePicture as fallback
+    const photos = this.ensurePhotosArray(profile.photos, profile.profilePicture);
+
     return {
       id: (profile._id as any).toString(),
       userId: profile.userId,
       firstName: profile.firstName || '',
       lastName: profile.lastName || '',
       displayName: profile.displayName || `${profile.firstName || ''} ${profile.lastName || ''}`.trim(),
-      avatar: profile.avatar || profile.photos?.[0] || null,
+      avatar: profile.avatar || profile.profilePicture || photos?.[0]?.url || null,
       bio: profile.bio || null,
       age: profile.age || null,
       gender: profile.gender || null,
@@ -82,7 +88,7 @@ export class ResponseTransformer {
       company: profile.company || null,
       education: profile.education || null,
       zodiacSign: profile.zodiacSign || null,
-      photos: this.transformPhotos(profile.photos),
+      photos,
       profileCompleteness: profile.profileCompleteness || null,
       profileViews: profile.profileViews || null,
       createdAt: profile.createdAt?.toISOString() || new Date().toISOString(),
@@ -107,6 +113,28 @@ export class ResponseTransformer {
       createdAt: (match as any).createdAt?.toISOString() || new Date().toISOString(),
       matchedAt: match.matchedAt?.toISOString() || null,
     };
+  }
+
+  /**
+   * Ensure photos array is not empty - use profilePicture as fallback
+   */
+  private static ensurePhotosArray(photos?: string[], profilePicture?: string): PhotoResponseDto[] | null {
+    // If photos array exists and has content, use it
+    if (photos && photos.length > 0) {
+      return this.transformPhotos(photos);
+    }
+
+    // If photos is empty but profilePicture exists, create photos array from profilePicture
+    if (profilePicture) {
+      return [{
+        url: profilePicture,
+        order: 0,
+        uploadedAt: null,
+      }];
+    }
+
+    // No photos available
+    return null;
   }
 
   /**
