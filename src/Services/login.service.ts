@@ -182,7 +182,7 @@ export class AuthService {
       fbRes = await axios.get('https://graph.facebook.com/me', {
         params: {
           access_token: accessToken,
-          fields: 'id,email,name,picture'
+          fields: 'id,email,name,picture.type(large)'
         }
       });
     } catch {
@@ -200,6 +200,15 @@ export class AuthService {
       const parts = fbData.name.split(' ');
       firstName = parts[0];
       lastName = parts.slice(1).join(' ');
+    }
+
+    let cloudinaryAvatar: string | null = null;
+    const pictureUrl = fbData.picture?.data?.url;
+    if (pictureUrl) {
+      try {
+        cloudinaryAvatar = await this.cloudinaryService.uploadImage(pictureUrl);
+      } catch (err) {
+      }
     }
 
     let user = await this.userModel.findOne({ facebookId: fbData.id }).exec();
@@ -222,7 +231,7 @@ export class AuthService {
         userId: user.id,
         firstName,
         lastName,
-        // profilePicture: fbData.picture?.data?.url
+        avatar: cloudinaryAvatar
       });
     } else {
       await this.profileModel.updateOne(
@@ -230,7 +239,7 @@ export class AuthService {
         {
           $set: {
             firstName, lastName,
-            // 
+            profilePicture: cloudinaryAvatar,
           }
         },
         { upsert: true }
@@ -256,7 +265,7 @@ export class AuthService {
       profile: profile ? {
         firstName: profile.firstName,
         lastName: profile.lastName,
-        // profilePicture: profile.profilePicture
+        avatar: cloudinaryAvatar || profile.avatar,
       } : {},
       accessToken: accessTokenJwt,
       refreshToken: refreshTokenJwt,
