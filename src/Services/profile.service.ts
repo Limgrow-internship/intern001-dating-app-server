@@ -68,6 +68,20 @@ export class ProfileService {
             }
         }
 
+        // Handle profilePicture - automatically add to photos array if not exists
+        if (updateProfileDto.profilePicture) {
+            const currentPhotos = profile.photos || [];
+
+            // Check if this profilePicture URL already exists in photos array
+            const existingPhoto = currentPhotos.find(photoUrl => photoUrl === updateProfileDto.profilePicture);
+
+            if (!existingPhoto) {
+                // Add profilePicture as the first photo in the array
+                updateData.photos = [updateProfileDto.profilePicture, ...currentPhotos];
+                console.log(`Added profilePicture to photos array for userId: ${userId}`);
+            }
+        }
+
         const updatedProfile = await this.profileModel.findOneAndUpdate(
             { userId },
             { $set: updateData },

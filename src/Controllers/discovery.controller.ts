@@ -36,7 +36,7 @@ import {
 } from '../DTO/match-list-response.dto';
 
 @ApiTags('Discovery')
-@Controller('api/discovery')
+@Controller('discovery')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class DiscoveryController {

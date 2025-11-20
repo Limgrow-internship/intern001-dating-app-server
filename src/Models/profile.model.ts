@@ -59,6 +59,15 @@ export class Profile {
     @Prop({ type: String, enum: ['dating', 'friend'], default: 'dating' })
     mode?: string;
 
+    @Prop()
+    verifiedAt?: Date;
+
+    @Prop()
+    selfieImage?: string; 
+
+    @Prop({ default: false })
+    verifiedBadge?: boolean;
+
     // New fields for Android compatibility
     @Prop()
     occupation?: string;
@@ -75,7 +84,7 @@ export class Profile {
     @Prop({ type: Number, min: 120, max: 220 })
     height?: number; // in centimeters
 
-    @Prop({ type: Number, min: 30, max: 200 })
+    @Prop({ type: Number, min: 30, max: 300 })
     weight?: number; // in kilograms
 
     @Prop()
@@ -89,6 +98,15 @@ export class Profile {
 
     @Prop({ type: Number, default: 0 })
     profileViews?: number;
+
+    @Prop()
+    goals?: string; // Goals/objectives
+
+    @Prop()
+    job?: string; // Job title
+
+    @Prop({ type: Object })
+    openQuestionAnswers?: Record<string, string>; // Answers to open questions
 }
 
 export const ProfileSchema = SchemaFactory.createForClass(Profile);
