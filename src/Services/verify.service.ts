@@ -13,10 +13,10 @@ export class VerifyService {
   ) {
 
     faceapi.env.monkeyPatch({
-        Canvas: canvas.Canvas as any,
-        Image: canvas.Image as any,
-        ImageData: canvas.ImageData as any,
-      });
+      Canvas: canvas.Canvas as any,
+      Image: canvas.Image as any,
+      ImageData: canvas.ImageData as any,
+    });
   }
 
   async verifyFace(userId: string, selfieBuffer: Buffer) {
@@ -28,7 +28,7 @@ export class VerifyService {
 
     const profile = await this.profileModel.findOne({ userId });
     console.log("Querying profile", userId);
-console.log("Result profile:", profile);
+    console.log("Result profile:", profile);
     if (!profile || !profile.profilePicture) {
       return { verified: false, message: 'No profile image found' };
     }

@@ -20,4 +20,4 @@ import { VerifyService } from '../Services/verify.service';
   providers: [ProfileService, JwtAuthGuard, VerifyService],
   exports: [ProfileService, MongooseModule],
 })
-export class ProfileModule {}
+export class ProfileModule { }

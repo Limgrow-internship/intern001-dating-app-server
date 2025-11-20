@@ -9,6 +9,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { UserService } from '../Services/user.service';
 import { Profile, ProfileDocument } from '../Models/profile.model';
 import axios from 'axios';
+import { CloudinaryService } from '../Services/cloudinary.service';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +22,7 @@ export class AuthService {
     private jwt: JwtService,
     private userService: UserService,
     private jwtService: JwtService,
+    private readonly cloudinaryService: CloudinaryService
   ) { }
 
   private async findByEmail(email: string): Promise<UserDocument | null> {
@@ -85,6 +87,17 @@ export class AuthService {
     const name = payload.name || '';
     const picture = payload.picture || null;
 
+    let cloudinaryAvatar: string | null = null;
+    if (picture) {
+      try {
+        cloudinaryAvatar = await this.cloudinaryService.uploadImage(picture);
+        console.log("[GoogleLogin] Uploaded avatar:", cloudinaryAvatar);
+      } catch (err) {
+        console.error("[GoogleLogin] Cloudinary upload error:", err);
+      }
+    }
+
+
     let firstName = '';
     let lastName = '';
     if (name) {
@@ -115,14 +128,21 @@ export class AuthService {
         userId: user.id,
         firstName,
         lastName,
-        profilePicture: picture,
+        avatar: cloudinaryAvatar,
       });
     } else {
       const updateResult = await this.profileModel.updateOne(
         { userId: user.id },
-        { $set: { firstName, lastName, profilePicture: picture } },
-        { upsert: true },
+        {
+          $set: {
+            firstName,
+            lastName,
+            profilePicture: cloudinaryAvatar,
+          }
+        },
+        { upsert: true }
       );
+
       console.log("[GoogleLogin] profile update result:", updateResult);
     }
 
@@ -147,7 +167,7 @@ export class AuthService {
         ? {
           firstName: profile.firstName,
           lastName: profile.lastName,
-          profilePicture: profile.profilePicture,
+          profilePicture: cloudinaryAvatar || profile.profilePicture,
         }
         : {},
       accessToken: accessTokenJwt,
@@ -155,6 +175,7 @@ export class AuthService {
       message: 'Login with Google successfully!',
     };
   }
+
   async facebookLogin(accessToken: string) {
     let fbRes: any = null;
     try {
@@ -189,7 +210,7 @@ export class AuthService {
     if (!user) {
       user = await this.userModel.create({
         facebookId: fbData.id,
-        email: fbData.email || `${fbData.id}@facebook.com`, 
+        email: fbData.email || `${fbData.id}@facebook.com`,
         authMethods: ['facebook'],
         status: 'active'
       });
@@ -206,9 +227,12 @@ export class AuthService {
     } else {
       await this.profileModel.updateOne(
         { userId: user.id },
-        { $set: { firstName, lastName, 
-          // 
-           } },
+        {
+          $set: {
+            firstName, lastName,
+            // 
+          }
+        },
         { upsert: true }
       );
     }
