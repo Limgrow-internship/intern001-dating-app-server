@@ -95,28 +95,29 @@ export class ProfileService {
 
             return updatedProfile;
         }
+    }
 
     async deleteProfile(userId: string) {
-            const result = await this.profileModel.deleteOne({ userId });
+        const result = await this.profileModel.deleteOne({ userId });
 
-            if (result.deletedCount === 0) {
-                throw new NotFoundException('Profile not found');
-            }
-
-            return { message: 'Profile deleted successfully' };
+        if (result.deletedCount === 0) {
+            throw new NotFoundException('Profile not found');
         }
 
-    async getAllProfiles(filters ?: { mode?: string; gender?: string }) {
-            const query: any = {};
-
-            if (filters?.mode) {
-                query.mode = filters.mode;
-            }
-
-            if (filters?.gender) {
-                query.gender = filters.gender;
-            }
-
-            return await this.profileModel.find(query).select('-__v');
-        }
+        return { message: 'Profile deleted successfully' };
     }
+
+    async getAllProfiles(filters?: { mode?: string; gender?: string }) {
+        const query: any = {};
+
+        if (filters?.mode) {
+            query.mode = filters.mode;
+        }
+
+        if (filters?.gender) {
+            query.gender = filters.gender;
+        }
+
+        return await this.profileModel.find(query).select('-__v');
+    }
+}
