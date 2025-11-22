@@ -39,79 +39,84 @@ export class ProfileService {
     async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
         let profile = await this.profileModel.findOne({ userId });
 
-        // Auto-create profile if not exists (for users who signed up before profile feature)
         if (!profile) {
-            console.log(`Profile not found for userId: ${userId}, creating new profile...`);
             profile = new this.profileModel({
                 userId,
                 interests: [],
                 mode: 'dating',
+                photos: []
             });
             await profile.save();
-            console.log(`New profile created for userId: ${userId}`);
         }
 
-        // Prepare update data
         const updateData: any = { ...updateProfileDto };
-
-        // Handle location field - convert to GeoJSON format if provided
         if (updateProfileDto.location) {
-            if (typeof updateProfileDto.location === 'object' && 'longitude' in updateProfileDto.location && 'latitude' in updateProfileDto.location) {
-                // Convert { longitude, latitude } to GeoJSON format
+            const loc = updateProfileDto.location;
+            if (typeof loc === 'object' && 'longitude' in loc && 'latitude' in loc) {
                 updateData.location = {
                     type: 'Point',
-                    coordinates: [updateProfileDto.location.longitude, updateProfileDto.location.latitude]
+                    coordinates: [loc.longitude, loc.latitude]
                 };
             } else {
-                // If it's a string or invalid format, remove it from update to prevent geo index errors
                 delete updateData.location;
             }
         }
 
-        // Handle profilePicture - automatically add to photos array if not exists
-        if (updateProfileDto.profilePicture) {
-            const currentPhotos = profile.photos || [];
+        let newPhotos: string[] = [];
 
-            // Check if this profilePicture URL already exists in photos array
-            const existingPhoto = currentPhotos.find(photoUrl => photoUrl === updateProfileDto.profilePicture);
+        if (Array.isArray(updateProfileDto.photos)) {
+            newPhotos = updateProfileDto.photos
+                .map((p: any) => {
+                    if (typeof p === 'string') return p.trim();
+                    if (p && typeof p === 'object' && typeof p.url === 'string') return p.url.trim();
+                    return null;
+                })
+                .filter((v): v is string => !!v);
 
-            if (!existingPhoto) {
-                // Add profilePicture as the first photo in the array
-                updateData.photos = [updateProfileDto.profilePicture, ...currentPhotos];
-                console.log(`Added profilePicture to photos array for userId: ${userId}`);
+            if (updateProfileDto.profilePicture) {
+                const mainUrl = updateProfileDto.profilePicture.trim();
+
+                const allPhotos = [
+                    mainUrl,
+                    ...(profile.photos || []).filter(p => p !== mainUrl),
+                    ...newPhotos.filter(p => p !== mainUrl)
+                ];
+
+                updateData.photos = Array.from(new Set(allPhotos));
+            } else if (newPhotos.length > 0) {
+                updateData.photos = Array.from(new Set(newPhotos));
             }
+
+            const updatedProfile = await this.profileModel.findOneAndUpdate(
+                { userId },
+                { $set: updateData },
+                { new: true }
+            );
+
+            return updatedProfile;
         }
-
-        const updatedProfile = await this.profileModel.findOneAndUpdate(
-            { userId },
-            { $set: updateData },
-            { new: true }
-        );
-
-        return updatedProfile;
-    }
 
     async deleteProfile(userId: string) {
-        const result = await this.profileModel.deleteOne({ userId });
+            const result = await this.profileModel.deleteOne({ userId });
 
-        if (result.deletedCount === 0) {
-            throw new NotFoundException('Profile not found');
+            if (result.deletedCount === 0) {
+                throw new NotFoundException('Profile not found');
+            }
+
+            return { message: 'Profile deleted successfully' };
         }
 
-        return { message: 'Profile deleted successfully' };
+    async getAllProfiles(filters ?: { mode?: string; gender?: string }) {
+            const query: any = {};
+
+            if (filters?.mode) {
+                query.mode = filters.mode;
+            }
+
+            if (filters?.gender) {
+                query.gender = filters.gender;
+            }
+
+            return await this.profileModel.find(query).select('-__v');
+        }
     }
-
-    async getAllProfiles(filters?: { mode?: string; gender?: string }) {
-        const query: any = {};
-
-        if (filters?.mode) {
-            query.mode = filters.mode;
-        }
-
-        if (filters?.gender) {
-            query.gender = filters.gender;
-        }
-
-        return await this.profileModel.find(query).select('-__v');
-    }
-}
