@@ -13,6 +13,7 @@ import { AIFeaturesService } from '../Services/ai-features.service';
 
 // Controllers
 import { AIController } from '../Controllers/ai.controller';
+import { PhotoModule } from './photo.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AIController } from '../Controllers/ai.controller';
       { name: Match.name, schema: MatchSchema },
     ]),
     JwtModule.register({}),
+    PhotoModule,
   ],
   controllers: [AIController],
   providers: [AIRouterService, AIFeaturesService],
