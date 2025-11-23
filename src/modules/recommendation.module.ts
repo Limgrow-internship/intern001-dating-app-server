@@ -19,6 +19,7 @@ import { RecommendationController } from '../Controllers/recommendation.controll
 import { MatchController } from '../Controllers/match.controller';
 import { DiscoveryController } from '../Controllers/discovery.controller';
 import { PreferenceController } from '../Controllers/preference.controller';
+import { PhotoModule } from './photo.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { PreferenceController } from '../Controllers/preference.controller';
       }),
       inject: [ConfigService],
     }),
+    PhotoModule,
   ],
   controllers: [
     RecommendationController,

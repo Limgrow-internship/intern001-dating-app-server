@@ -33,9 +33,12 @@ export class ProfilePictureMigration {
 
     for (const user of usersToMigrate) {
       try {
+        // Cast to any to access legacy fields from database
+        const userAny = user as any;
+        
         // Set photos array to contain profilePicture
-        if (user.profilePicture) {
-          user.photos = [user.profilePicture];
+        if (userAny.profilePicture) {
+          userAny.photos = [userAny.profilePicture];
           await user.save();
           migratedCount++;
 

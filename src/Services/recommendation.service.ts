@@ -5,6 +5,7 @@ import { Profile, ProfileDocument } from '../Models/profile.model';
 import { Swipe, SwipeDocument } from '../Models/swipe.model';
 import { Preference, PreferenceDocument } from '../Models/preference.model';
 import { BlockedUser, BlockedUserDocument } from '../Models/blocked-user.model';
+import { PhotoService } from './photo.service';
 
 interface ScoredProfile {
   profile: ProfileDocument;
@@ -26,6 +27,7 @@ export class RecommendationService {
     private preferenceModel: Model<PreferenceDocument>,
     @InjectModel(BlockedUser.name)
     private blockedUserModel: Model<BlockedUserDocument>,
+    private photoService: PhotoService,
   ) {}
 
   /**
@@ -123,12 +125,23 @@ export class RecommendationService {
       .find({ userId: { $in: recentTargetIds } })
       .exec();
 
-    // 7. Score each candidate
+    // 7. Fetch photos for all candidates in parallel
+    const candidatePhotosMap = new Map<string, any[]>();
+    await Promise.all(
+      candidates.map(async (candidate) => {
+        const photos = await this.photoService.getUserPhotos(candidate.userId);
+        candidatePhotosMap.set(candidate.userId, photos);
+      }),
+    );
+
+    // 8. Score each candidate
     const scoredCandidates: ScoredProfile[] = candidates.map((candidate) => {
+      const candidatePhotos = candidatePhotosMap.get(candidate.userId) || [];
       const breakdown = this.calculateHybridScore(
         userProfile,
         candidate,
         recentProfiles,
+        candidatePhotos,
       );
 
       const totalScore =
@@ -144,7 +157,7 @@ export class RecommendationService {
       };
     });
 
-    // 8. Sort by score and add some randomization to top results
+    // 9. Sort by score and add some randomization to top results
     const sorted = scoredCandidates.sort((a, b) => b.score - a.score);
 
     // Add randomization to top 20% to avoid deterministic ordering
@@ -162,18 +175,19 @@ export class RecommendationService {
     userProfile: ProfileDocument,
     candidate: ProfileDocument,
     recentProfiles: ProfileDocument[],
+    candidatePhotos: any[],
   ): {
     filterScore: number;
     interestScore: number;
     activityScore: number;
     diversityScore: number;
   } {
-    const filterScore = this.calculateFilterScore(userProfile, candidate);
+    const filterScore = this.calculateFilterScore(userProfile, candidate, candidatePhotos);
     const interestScore = this.calculateInterestScore(
       userProfile.interests || [],
       candidate.interests || [],
     );
-    const activityScore = this.calculateActivityScore(candidate);
+    const activityScore = this.calculateActivityScore(candidate, candidatePhotos);
     const diversityScore = this.calculateDiversityScore(
       candidate,
       recentProfiles,
@@ -194,6 +208,7 @@ export class RecommendationService {
   private calculateFilterScore(
     userProfile: ProfileDocument,
     candidate: ProfileDocument,
+    candidatePhotos: any[],
   ): number {
     let score = 0;
     let maxScore = 0;
@@ -204,7 +219,8 @@ export class RecommendationService {
     if (candidate.bio && candidate.bio.length > 0) completeness += 33.33;
     if (candidate.interests && candidate.interests.length > 0)
       completeness += 33.33;
-    if (candidate.profilePicture) completeness += 33.34;
+    // Check if candidate has photos
+    if (candidatePhotos && candidatePhotos.length > 0) completeness += 33.34;
     score += completeness;
 
     return maxScore > 0 ? (score / maxScore) * 100 : 0;
@@ -238,7 +254,7 @@ export class RecommendationService {
    * Activity score based on profile data (0-100)
    * Lightweight ML component - learns from profile patterns
    */
-  private calculateActivityScore(candidate: ProfileDocument): number {
+  private calculateActivityScore(candidate: ProfileDocument, candidatePhotos: any[]): number {
     let score = 0;
 
     // Recent profile updates (within 30 days)
@@ -251,7 +267,8 @@ export class RecommendationService {
     // Profile completeness
     if (candidate.bio && candidate.bio.length > 50) score += 25;
     if (candidate.interests && candidate.interests.length >= 3) score += 25;
-    if (candidate.profilePicture) score += 20;
+    // Check if candidate has photos
+    if (candidatePhotos && candidatePhotos.length > 0) score += 20;
 
     return Math.min(score, 100);
   }
