@@ -11,7 +11,6 @@ export class VerifyService {
     @InjectModel(Profile.name)
     private readonly profileModel: Model<ProfileDocument>,
   ) {
-
     faceapi.env.monkeyPatch({
       Canvas: canvas.Canvas as any,
       Image: canvas.Image as any,
@@ -29,13 +28,12 @@ export class VerifyService {
     const profile = await this.profileModel.findOne({ userId });
     console.log("Querying profile", userId);
     console.log("Result profile:", profile);
-    if (!profile || !profile.profilePicture) {
+    // Đảm bảo có ít nhất 1 trong 2 trường
+    if (!profile || (!profile.profilePicture && !profile.avatar)) {
       return { verified: false, message: 'No profile image found' };
     }
 
-    // Có thể định nghĩa selfieImg/profileImg là any hoặc dùng @ts-ignore
-    // @ts-ignore
-    const profileImg: any = await canvas.loadImage(profile.profilePicture);
+    // Load selfie
     // @ts-ignore
     const selfieImg: any = await canvas.loadImage(selfieBuffer);
 
@@ -45,21 +43,54 @@ export class VerifyService {
       .withFaceLandmarks()
       .withFaceDescriptor();
 
-    // @ts-ignore
-    const profileDesc = await faceapi
-      .detectSingleFace(profileImg)
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-
-    if (!selfieDesc || !profileDesc) {
-      return { verified: false, message: 'Could not detect a face from image.' };
+    if (!selfieDesc) {
+      return { verified: false, message: 'Could not detect a face from selfie.' };
     }
 
-    const distance = faceapi.euclideanDistance(
-      selfieDesc.descriptor,
-      profileDesc.descriptor
-    );
-    if (distance < 0.5) {
+    let verified = false;
+    let compareResults: { source: string; distance: number }[] = [];
+
+    // So sánh với avatar nếu có
+    if (profile.avatar) {
+      // @ts-ignore
+      const avatarImg: any = await canvas.loadImage(profile.avatar);
+      // @ts-ignore
+      const avatarDesc = await faceapi
+        .detectSingleFace(avatarImg)
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (avatarDesc) {
+        const distance = faceapi.euclideanDistance(
+          selfieDesc.descriptor,
+          avatarDesc.descriptor
+        );
+        compareResults.push({ source: "avatar", distance });
+        if (distance < 0.5) verified = true;
+      }
+    }
+
+    // So sánh với profilePicture nếu có
+    if (profile.profilePicture) {
+      // @ts-ignore
+      const profileImg: any = await canvas.loadImage(profile.profilePicture);
+      // @ts-ignore
+      const profileDesc = await faceapi
+        .detectSingleFace(profileImg)
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (profileDesc) {
+        const distance = faceapi.euclideanDistance(
+          selfieDesc.descriptor,
+          profileDesc.descriptor
+        );
+        compareResults.push({ source: "profilePicture", distance });
+        if (distance < 0.5) verified = true;
+      }
+    }
+
+    if (verified) {
       await this.profileModel.updateOne(
         { userId },
         {
@@ -69,9 +100,17 @@ export class VerifyService {
           verifiedBadge: true,
         }
       );
-      return { verified: true, message: 'Verification successful!' };
+      return {
+        verified: true,
+        message: 'Verification successful!',
+        compareResults
+      };
     } else {
-      return { verified: false, message: 'Face did not match, please try again.' };
+      return {
+        verified: false,
+        message: 'Face did not match, please try again.',
+        compareResults
+      };
     }
   }
 }
