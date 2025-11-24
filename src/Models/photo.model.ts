@@ -59,6 +59,8 @@ export class Photo extends Document {
   updatedAt?: Date;
 }
 
+export type PhotoDocument = Photo & Document;
+
 export const PhotoSchema = SchemaFactory.createForClass(Photo);
 
 PhotoSchema.index({ userId: 1, isPrimary: 1 });

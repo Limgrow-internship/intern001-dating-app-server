@@ -5,8 +5,6 @@ import { Profile, ProfileSchema } from '../Models/profile.model';
 import { ProfileService } from '../Services/profile.service';
 import { ProfileController } from '../Controllers/profile.controller';
 import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
-import { VerifyController } from '../Controllers/verify.controller';
-import { VerifyService } from '../Services/verify.service';
 import { PhotoModule } from './photo.module';
 
 @Module({
@@ -18,8 +16,8 @@ import { PhotoModule } from './photo.module';
     }),
     PhotoModule,
   ],
-  controllers: [ProfileController, VerifyController],
-  providers: [ProfileService, JwtAuthGuard, VerifyService],
+  controllers: [ProfileController],
+  providers: [ProfileService, JwtAuthGuard],
   exports: [ProfileService, MongooseModule],
 })
 export class ProfileModule { }
