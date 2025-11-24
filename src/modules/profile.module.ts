@@ -5,8 +5,9 @@ import { Profile, ProfileSchema } from '../Models/profile.model';
 import { ProfileService } from '../Services/profile.service';
 import { ProfileController } from '../Controllers/profile.controller';
 import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
-// import { VerifyController } from '../Controllers/verify.controller';
-// import { VerifyService } from '../Services/verify.service';
+import { VerifyController } from '../Controllers/verify.controller';
+import { VerifyService } from '../Services/verify.service';
+import { PhotoModule } from './photo.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
       secret: process.env.JWT_ACCESS_SECRET,
       signOptions: { expiresIn: '15m' },
     }),
+    PhotoModule,
   ],
   controllers: [ProfileController,
     // VerifyController

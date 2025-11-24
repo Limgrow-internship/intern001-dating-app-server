@@ -30,15 +30,6 @@ export class Profile {
   @Prop()
   bio?: string;
 
-  @Prop()
-  profilePicture?: string;
-
-  @Prop()
-  avatar?: string; // Primary photo URL
-
-  @Prop({ type: [String], default: [] })
-  photos?: string[];
-
   @Prop({ type: [String], default: [] })
   interests: string[];
 
@@ -62,9 +53,6 @@ export class Profile {
 
   @Prop()
   verifiedAt?: Date;
-
-  @Prop()
-  selfieImage?: string;
 
   @Prop({ default: false })
   verifiedBadge?: boolean;
@@ -100,8 +88,8 @@ export class Profile {
   @Prop({ type: Number, default: 0 })
   profileViews?: number;
 
-  @Prop()
-  goals?: string; // Goals/objectives
+  @Prop({ type: [String], default: [] })
+  goals?: string[]; // Goals/objectives
 
   @Prop()
   job?: string; // Job title

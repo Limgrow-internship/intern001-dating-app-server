@@ -112,10 +112,11 @@ export class UpdateProfileDto {
     @Max(300)
     weight?: number;
 
-    @ApiPropertyOptional({ description: 'Goals/objectives' })
+    @ApiPropertyOptional({ description: 'Goals/objectives', type: [String] })
     @IsOptional()
-    @IsString()
-    goals?: string;
+    @IsArray()
+    @IsString({ each: true })
+    goals?: string[];
 
     @ApiPropertyOptional({ description: 'Job title' })
     @IsOptional()
@@ -132,6 +133,12 @@ export class UpdateProfileDto {
     @IsString()
     @IsIn(['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'])
     zodiac?: string;
+
+    @ApiPropertyOptional({ description: 'Zodiac sign (alias for zodiac)', enum: ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'] })
+    @IsOptional()
+    @IsString()
+    @IsIn(['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'])
+    zodiacSign?: string;
 
     @ApiPropertyOptional({
         description: 'Answers to open questions',

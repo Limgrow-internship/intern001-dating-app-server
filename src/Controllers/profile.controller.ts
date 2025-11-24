@@ -13,14 +13,14 @@ export class ProfileController {
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
-        summary: '6️⃣ Get Profile (from Profile collection)',
-        description: '🔒 Requires JWT token. Get profile from separate Profile collection.'
+        summary: '6️⃣ Get Profile with Photos (NEW)',
+        description: '🔒 Requires JWT token. Get profile with photos from Photos collection. Returns avatar and photos array with metadata.'
     })
-    @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
+    @ApiResponse({ status: 200, description: 'Profile retrieved successfully with photos' })
     @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
     @ApiResponse({ status: 404, description: 'Profile not found' })
     async getProfile(@Request() req) {
-        return this.profileService.getProfile(req.user.userId);
+        return this.profileService.getProfileWithPhotos(req.user.userId);
     }
 
     @Put()
