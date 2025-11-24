@@ -31,7 +31,9 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   login(@Body() body: Login) {
-    return this.auth.login(body.email, body.password);
+    // Support both fcmToken (new) and deviceToken (legacy) for backward compatibility
+    const fcmToken = body.fcmToken || body.deviceToken;
+    return this.auth.login(body.email, body.password, fcmToken);
   }
 
   @Post('google-login')
