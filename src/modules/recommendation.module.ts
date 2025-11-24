@@ -20,6 +20,7 @@ import { MatchController } from '../Controllers/match.controller';
 import { DiscoveryController } from '../Controllers/discovery.controller';
 import { PreferenceController } from '../Controllers/preference.controller';
 import { PhotoModule } from './photo.module';
+import { FcmService } from '../Services/fcm.service';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { PhotoModule } from './photo.module';
     MatchActionService,
     DiscoveryService,
     PreferenceService,
+    FcmService,
   ],
   exports: [
     RecommendationService,
@@ -62,6 +64,7 @@ import { PhotoModule } from './photo.module';
     MatchActionService,
     DiscoveryService,
     PreferenceService,
+    FcmService,
   ],
 })
 export class RecommendationModule { }

@@ -219,7 +219,7 @@ export class DiscoveryController {
     );
   }
 
-  @Get(':matchId')
+  @Get('match/:matchId')
   @ApiOperation({
     summary: 'Get match by ID',
     description: 'Get details of a specific match',

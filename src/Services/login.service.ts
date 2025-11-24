@@ -32,7 +32,7 @@ export class AuthService {
     return this.userModel.findOne({ email }).exec();
   }
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, deviceToken?: string) {
     const user = await this.findByEmail(email);
     if (!user) {
       throw new UnauthorizedException('Email không tồn tại');
@@ -45,6 +45,30 @@ export class AuthService {
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
       throw new UnauthorizedException('Mật khẩu không đúng');
+    }
+
+    // Update last login and FCM token if deviceToken is provided
+    const updateData: any = {
+      lastLogin: new Date()
+    };
+
+    if (deviceToken) {
+      updateData.fcmToken = deviceToken;
+      updateData.fcmTokenUpdatedAt = new Date();
+    }
+
+    if (Object.keys(updateData).length > 1 || updateData.lastLogin) {
+      await this.userModel.updateOne({ id: user.id }, { $set: updateData }).exec();
+    }
+
+    // Ensure profile exists (create if it doesn't)
+    const existingProfile = await this.profileModel.findOne({ userId: user.id }).exec();
+    if (!existingProfile) {
+      await this.profileModel.create({
+        userId: user.id,
+        interests: [],
+        mode: 'dating',
+      });
     }
 
     const accessToken = this.jwt.sign(
