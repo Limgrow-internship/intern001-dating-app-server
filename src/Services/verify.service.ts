@@ -1,3 +1,136 @@
+// Face verification feature is temporarily disabled due to TensorFlow.js native module issues
+// Uncomment when Visual Studio Build Tools are installed and TensorFlow.js is properly configured
+
+/*
+import { Injectable } from '@nestjs/common';
+import * as faceapi from '@vladmandic/face-api';
+import * as canvas from 'canvas';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Photo, PhotoDocument, PhotoType } from '../Models/photo.model';
+import { Profile, ProfileDocument } from '../Models/profile.model';
+
+@Injectable()
+export class VerifyService {
+  private modelsLoaded = false;
+
+  constructor(
+    @InjectModel(Photo.name)
+    private readonly photoModel: Model<PhotoDocument>,
+    @InjectModel(Profile.name)
+    private readonly profileModel: Model<ProfileDocument>,
+  ) {
+    faceapi.env.monkeyPatch({
+      Canvas: canvas.Canvas as any,
+      Image: canvas.Image as any,
+      ImageData: canvas.ImageData as any,
+    });
+    this.loadModels(); // Đảm bảo load model 1 lần
+  }
+
+  async loadModels() {
+    if (this.modelsLoaded) return;
+    await faceapi.nets.ssdMobilenetv1.loadFromDisk('./models');
+    await faceapi.nets.faceRecognitionNet.loadFromDisk('./models');
+    await faceapi.nets.faceLandmark68Net.loadFromDisk('./models');
+    this.modelsLoaded = true;
+  }
+
+  // Hàm align + resize khuôn mặt về 150x150 rồi lấy descriptor
+  private async getAlignedDescriptor(img: any): Promise<Float32Array | null> {
+    const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+    if (!detection) return null;
+    const faceBox = detection.detection.box;
+    const c = canvas.createCanvas(150, 150);
+    const ctx = c.getContext('2d');
+    ctx.drawImage(
+      img,
+      faceBox.x, faceBox.y, faceBox.width, faceBox.height,
+      0, 0, 150, 150
+    );
+    // Ép kiểu as any để tránh lỗi TNetInput
+    const alignedDesc = await faceapi.detectSingleFace(c as any).withFaceLandmarks().withFaceDescriptor();
+    if (!alignedDesc) return null;
+    return alignedDesc.descriptor;
+  }
+
+  async verifyFace(userId: string, selfieBuffer: Buffer) {
+    await this.loadModels();
+
+    // Lấy ảnh của user
+    const candidatePhotos = await this.photoModel.find({
+      userId,
+      type: { $in: [PhotoType.AVATAR, PhotoType.GALLERY] },
+      isActive: true,
+    });
+
+    if (!candidatePhotos.length) {
+      return { verified: false, message: 'No matching photo found (avatar/gallery)' };
+    }
+
+    // Load và align ảnh selfie
+    const selfieImg: any = await canvas.loadImage(selfieBuffer);
+    const selfieDesc = await this.getAlignedDescriptor(selfieImg);
+    if (!selfieDesc) {
+      return { verified: false, message: 'Could not detect a face from selfie.' };
+    }
+
+    let minDistance = 1;
+    let verifiedPhotoId: any = null;
+
+    for (const photo of candidatePhotos) {
+      try {
+        const profileImg: any = await canvas.loadImage(photo.url);
+        const profileDesc = await this.getAlignedDescriptor(profileImg);
+        if (!profileDesc) continue;
+        const distance = faceapi.euclideanDistance(selfieDesc, profileDesc);
+        if (distance < minDistance) {
+          minDistance = distance;
+          verifiedPhotoId = photo._id;
+        }
+      } catch (err) {
+        // Ignore lỗi từng ảnh gallery
+        continue;
+      }
+    }
+
+    const THRESHOLD = 0.45; // Bạn nên tune lại ngưỡng này cho phù hợp ảnh thật tế
+
+    if (minDistance < THRESHOLD && verifiedPhotoId) {
+      await this.photoModel.updateOne(
+        { _id: verifiedPhotoId },
+        { isVerified: true }
+      );
+      await this.profileModel.updateOne(
+        { userId },
+        { isVerified: true, verifiedBadge: true, verifiedAt: new Date() }
+      );
+      return {
+        verified: true,
+        message: `Verification successful! (distance: ${minDistance.toFixed(3)})`
+      };
+    }
+
+    return {
+      verified: false,
+      message: `Face did not match with any photo, min distance: ${minDistance.toFixed(3)}, please try again.`
+    };
+  }
+}
+*/
+
+// Temporary stub implementation to prevent module errors
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class VerifyService {
+  async verifyFace(userId: string, selfieBuffer: Buffer) {
+    return {
+      verified: false,
+      message: 'Face verification is temporarily disabled. Please install Visual Studio Build Tools and rebuild TensorFlow.js to enable this feature.'
+    };
+  }
+}
 // import { Injectable } from '@nestjs/common';
 // import * as faceapi from '@vladmandic/face-api';
 // import * as canvas from 'canvas';
