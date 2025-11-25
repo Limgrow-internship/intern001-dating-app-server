@@ -1,3 +1,7 @@
+// Face verification feature is temporarily disabled due to TensorFlow.js native module issues
+// Uncomment when Visual Studio Build Tools are installed and TensorFlow.js is properly configured
+
+/*
 import { Injectable } from '@nestjs/common';
 import * as faceapi from '@vladmandic/face-api';
 import * as canvas from 'canvas';
@@ -110,6 +114,20 @@ export class VerifyService {
     return {
       verified: false,
       message: `Face did not match with any photo, min distance: ${minDistance.toFixed(3)}, please try again.`
+    };
+  }
+}
+*/
+
+// Temporary stub implementation to prevent module errors
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class VerifyService {
+  async verifyFace(userId: string, selfieBuffer: Buffer) {
+    return {
+      verified: false,
+      message: 'Face verification is temporarily disabled. Please install Visual Studio Build Tools and rebuild TensorFlow.js to enable this feature.'
     };
   }
 }
