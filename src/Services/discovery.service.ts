@@ -21,6 +21,9 @@ import {
 } from '../DTO/match-list-response.dto';
 import { ResponseTransformer } from '../Utils/response-transformer';
 import { RecommendationService } from './recommendation.service';
+import { PhotoService } from './photo.service';
+import { FcmService } from './fcm.service';
+import { User, UserDocument } from '../Models/user.model';
 
 @Injectable()
 export class DiscoveryService {
@@ -30,7 +33,10 @@ export class DiscoveryService {
     @InjectModel(Profile.name) private profileModel: Model<ProfileDocument>,
     @InjectModel(BlockedUser.name) private blockedUserModel: Model<BlockedUserDocument>,
     @InjectModel(DailyLimit.name) private dailyLimitModel: Model<DailyLimitDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     private recommendationService: RecommendationService,
+    private photoService: PhotoService,
+    private fcmService: FcmService,
   ) {}
 
   /**
@@ -38,9 +44,14 @@ export class DiscoveryService {
    */
   async getNextMatchCard(userId: string): Promise<MatchCardResponseDto | null> {
     // Get user profile for location
-    const userProfile = await this.profileModel.findOne({ userId });
+    let userProfile = await this.profileModel.findOne({ userId });
     if (!userProfile) {
-      throw new NotFoundException('User profile not found');
+      // Create profile if it doesn't exist (fallback for users who logged in before profile creation was added)
+      userProfile = await this.profileModel.create({
+        userId,
+        interests: [],
+        mode: 'dating',
+      });
     }
 
     // Get blocked users (both ways: users I blocked + users who blocked me)
@@ -68,10 +79,14 @@ export class DiscoveryService {
       return null;
     }
 
+    // Fetch photos for candidate
+    const candidatePhotos = await this.photoService.getUserPhotos(topCandidate.userId);
+
     // Transform to Android DTO
     return ResponseTransformer.toMatchCardResponse(
       topCandidate,
       userProfile.location,
+      candidatePhotos,
     );
   }
 
@@ -82,9 +97,14 @@ export class DiscoveryService {
     userId: string,
     limit: number,
   ): Promise<MatchCardsListResponseDto> {
-    const userProfile = await this.profileModel.findOne({ userId });
+    let userProfile = await this.profileModel.findOne({ userId });
     if (!userProfile) {
-      throw new NotFoundException('User profile not found');
+      // Create profile if it doesn't exist (fallback for users who logged in before profile creation was added)
+      userProfile = await this.profileModel.create({
+        userId,
+        interests: [],
+        mode: 'dating',
+      });
     }
 
     const blockedUserIds = await this.getBlockedUserIds(userId);
@@ -98,20 +118,29 @@ export class DiscoveryService {
       limit + 5, // Get a few extra in case some are filtered
     );
 
-    // Filter out blocked/swiped users and transform
-    const cards = recommendations
+    // Filter out blocked/swiped users
+    const filteredRecs = recommendations
       .filter(
         (rec) =>
           !blockedUserIds.includes(rec.profile.userId) &&
           !swipedUserIds.includes(rec.profile.userId),
       )
-      .slice(0, limit)
-      .map((rec) =>
-        ResponseTransformer.toMatchCardResponse(rec.profile, userProfile.location),
-      );
+      .slice(0, limit);
+
+    // Fetch photos for all candidates in parallel
+    const cardsWithPhotos = await Promise.all(
+      filteredRecs.map(async (rec) => {
+        const photos = await this.photoService.getUserPhotos(rec.profile.userId);
+        return ResponseTransformer.toMatchCardResponse(
+          rec.profile,
+          userProfile.location,
+          photos,
+        );
+      }),
+    );
 
     return {
-      cards,
+      cards: cardsWithPhotos,
       hasMore: recommendations.length > limit,
     };
   }
@@ -136,20 +165,50 @@ export class DiscoveryService {
 
     // Check if already swiped
     const existingSwipe = await this.swipeModel.findOne({ userId, targetUserId });
+    
     if (existingSwipe) {
-      throw new BadRequestException('Already swiped on this user');
+      // If already liked, return current result (idempotent)
+      if (existingSwipe.action === 'like') {
+        // Check if already matched
+        const existingMatch = await this.matchModel.findOne({
+          $or: [
+            { userId, targetUserId, status: 'active' },
+            { userId: targetUserId, targetUserId: userId, status: 'active' },
+          ],
+        });
+
+        if (existingMatch) {
+          // Already matched, return match result
+          const targetPhotos = await this.photoService.getUserPhotos(targetUserId);
+          return ResponseTransformer.toMatchResult(true, existingMatch, targetProfile, targetPhotos);
+        }
+
+        // Already liked but no match yet
+        return ResponseTransformer.toMatchResult(false, null, null);
+      }
+
+      // If previously passed, allow changing to like (undo pass)
+      if (existingSwipe.action === 'pass') {
+        // Update the swipe action from pass to like
+        existingSwipe.action = 'like';
+        existingSwipe.timestamp = new Date();
+        await existingSwipe.save();
+      } else {
+        // Other cases, throw error
+        throw new BadRequestException('Already swiped on this user');
+      }
+    } else {
+      // Check if blocked
+      await this.checkNotBlocked(userId, targetUserId);
+
+      // Create new swipe
+      await this.swipeModel.create({
+        userId,
+        targetUserId,
+        action: 'like',
+        timestamp: new Date(),
+      });
     }
-
-    // Check if blocked
-    await this.checkNotBlocked(userId, targetUserId);
-
-    // Create swipe
-    await this.swipeModel.create({
-      userId,
-      targetUserId,
-      action: 'like',
-      timestamp: new Date(),
-    });
 
     // Check for reciprocal like
     const reciprocalLike = await this.swipeModel.findOne({
@@ -159,21 +218,147 @@ export class DiscoveryService {
     });
 
     if (!reciprocalLike) {
-      // No match yet
+      // No match yet - send like notification
+      await this.sendLikeNotification(userId, targetUserId);
+      
       return ResponseTransformer.toMatchResult(false, null, null);
+    }
+
+    // Check if match already exists
+    const existingMatch = await this.matchModel.findOne({
+      $or: [
+        { userId, targetUserId, status: 'active' },
+        { userId: targetUserId, targetUserId: userId, status: 'active' },
+      ],
+    });
+
+    if (existingMatch) {
+      // Match already exists, return it
+      const targetPhotos = await this.photoService.getUserPhotos(targetUserId);
+      return ResponseTransformer.toMatchResult(true, existingMatch, targetProfile, targetPhotos);
     }
 
     // Create match!
     const match = await this.matchModel.create({
       userId,
       targetUserId,
-      status: 'matched',
+      status: 'active',
       matchedAt: new Date(),
       // createdAt auto-generated by timestamps: true
     });
 
+    // Fetch photos for target profile
+    const targetPhotos = await this.photoService.getUserPhotos(targetUserId);
+
+    // Send match notifications to both users
+    await this.sendMatchNotification(userId, targetUserId, match);
+
     // Return match result with full profile
-    return ResponseTransformer.toMatchResult(true, match, targetProfile);
+    return ResponseTransformer.toMatchResult(true, match, targetProfile, targetPhotos);
+  }
+
+  /**
+   * Send like notification to target user
+   */
+  private async sendLikeNotification(likerId: string, targetUserId: string): Promise<void> {
+    try {
+      // Get target user's FCM token
+      const targetUser = await this.userModel.findOne({ id: targetUserId }).select('fcmToken');
+      if (!targetUser?.fcmToken) {
+        return; // No FCM token, skip notification
+      }
+
+      // Get liker's profile info
+      const likerProfile = await this.profileModel.findOne({ userId: likerId });
+      if (!likerProfile) {
+        return;
+      }
+
+      // Get liker's primary photo
+      const likerPhotos = await this.photoService.getUserPhotos(likerId);
+      const primaryPhoto = likerPhotos.find(p => p.isPrimary);
+      const likerPhotoUrl = primaryPhoto?.url || likerPhotos[0]?.url;
+
+      // Get display name
+      const likerName = likerProfile.displayName || 
+                       `${likerProfile.firstName || ''} ${likerProfile.lastName || ''}`.trim() || 
+                       'Someone';
+
+      // Send notification
+      await this.fcmService.sendLikeNotification(
+        targetUserId,
+        targetUser.fcmToken,
+        likerId,
+        likerName,
+        likerPhotoUrl,
+      );
+    } catch (error) {
+      console.error('Error sending like notification:', error);
+      // Don't throw - we don't want to fail the like operation
+    }
+  }
+
+  /**
+   * Send match notification to both users
+   */
+  private async sendMatchNotification(
+    userId1: string,
+    userId2: string,
+    match: MatchDocument,
+  ): Promise<void> {
+    try {
+      // Get both users' FCM tokens
+      const [user1, user2] = await Promise.all([
+        this.userModel.findOne({ id: userId1 }).select('fcmToken'),
+        this.userModel.findOne({ id: userId2 }).select('fcmToken'),
+      ]);
+
+      // Get both users' profiles
+      const [profile1, profile2] = await Promise.all([
+        this.profileModel.findOne({ userId: userId1 }),
+        this.profileModel.findOne({ userId: userId2 }),
+      ]);
+
+      if (!profile1 || !profile2) {
+        return;
+      }
+
+      // Get photos for both users
+      const [photos1, photos2] = await Promise.all([
+        this.photoService.getUserPhotos(userId1),
+        this.photoService.getUserPhotos(userId2),
+      ]);
+
+      const primaryPhoto1 = photos1.find(p => p.isPrimary);
+      const primaryPhoto2 = photos2.find(p => p.isPrimary);
+      const photoUrl1 = primaryPhoto1?.url || photos1[0]?.url;
+      const photoUrl2 = primaryPhoto2?.url || photos2[0]?.url;
+
+      // Get display names
+      const name1 = profile1.displayName || 
+                   `${profile1.firstName || ''} ${profile1.lastName || ''}`.trim() || 
+                   'Someone';
+      const name2 = profile2.displayName || 
+                   `${profile2.firstName || ''} ${profile2.lastName || ''}`.trim() || 
+                   'Someone';
+
+      // Send notifications to both users
+      const matchId = (match as any)._id?.toString() || (match as any).id;
+      await this.fcmService.sendMatchNotification(
+        userId1,
+        user1?.fcmToken || null,
+        userId2,
+        user2?.fcmToken || null,
+        matchId,
+        name1,
+        name2,
+        photoUrl1,
+        photoUrl2,
+      );
+    } catch (error) {
+      console.error('Error sending match notification:', error);
+      // Don't throw - we don't want to fail the match operation
+    }
   }
 
   /**
@@ -190,16 +375,39 @@ export class DiscoveryService {
     }
 
     const existingSwipe = await this.swipeModel.findOne({ userId, targetUserId });
+    
     if (existingSwipe) {
-      throw new BadRequestException('Already swiped on this user');
-    }
+      // If already passed, return success (idempotent)
+      if (existingSwipe.action === 'pass') {
+        return; // Already passed, no action needed
+      }
 
-    await this.swipeModel.create({
-      userId,
-      targetUserId,
-      action: 'pass',
-      timestamp: new Date(),
-    });
+      // If already liked, don't allow changing to pass
+      // (Once liked, user should use unmatch instead)
+      if (existingSwipe.action === 'like') {
+        // Check if matched
+        const existingMatch = await this.matchModel.findOne({
+          $or: [
+            { userId, targetUserId, status: 'active' },
+            { userId: targetUserId, targetUserId: userId, status: 'active' },
+          ],
+        });
+
+        if (existingMatch) {
+          throw new BadRequestException('Cannot pass on a matched user. Use unmatch instead.');
+        }
+
+        throw new BadRequestException('Cannot pass on a user you already liked');
+      }
+    } else {
+      // Create new pass swipe
+      await this.swipeModel.create({
+        userId,
+        targetUserId,
+        action: 'pass',
+        timestamp: new Date(),
+      });
+    }
   }
 
   /**
@@ -219,46 +427,125 @@ export class DiscoveryService {
     }
 
     const existingSwipe = await this.swipeModel.findOne({ userId, targetUserId });
-    if (existingSwipe) {
-      throw new BadRequestException('Already swiped on this user');
-    }
-
-    await this.checkNotBlocked(userId, targetUserId);
-
-    // Check daily super like limit
+    
+    // Check daily super like limit first
     const today = this.getTodayString();
     const dailyLimit = await this.dailyLimitModel.findOne({ userId, date: today });
 
-    if (dailyLimit) {
-      if (dailyLimit.superLikesCount >= dailyLimit.maxSuperLikes) {
-        throw new HttpException(
-          'Daily super like limit reached',
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
+    if (existingSwipe) {
+      // If already super liked, return current result (idempotent)
+      if (existingSwipe.action === 'like' && existingSwipe.isSuperLike) {
+        // Check if already matched
+        const existingMatch = await this.matchModel.findOne({
+          $or: [
+            { userId, targetUserId, status: 'active' },
+            { userId: targetUserId, targetUserId: userId, status: 'active' },
+          ],
+        });
+
+        if (existingMatch) {
+          const targetPhotos = await this.photoService.getUserPhotos(targetUserId);
+          return ResponseTransformer.toMatchResult(true, existingMatch, targetProfile, targetPhotos);
+        }
+
+        return ResponseTransformer.toMatchResult(false, null, null);
       }
-      // Increment counter
-      dailyLimit.superLikesCount += 1;
-      await dailyLimit.save();
+
+      // If already liked (regular like), upgrade to super like if quota allows
+      if (existingSwipe.action === 'like' && !existingSwipe.isSuperLike) {
+        // Check quota
+        if (dailyLimit && dailyLimit.superLikesCount >= dailyLimit.maxSuperLikes) {
+          throw new HttpException(
+            'Daily super like limit reached',
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+
+        // Update to super like
+        existingSwipe.isSuperLike = true;
+        existingSwipe.timestamp = new Date();
+        await existingSwipe.save();
+
+        // Update quota
+        if (dailyLimit) {
+          dailyLimit.superLikesCount += 1;
+          await dailyLimit.save();
+        } else {
+          await this.dailyLimitModel.create({
+            userId,
+            date: today,
+            likesCount: 0,
+            superLikesCount: 1,
+            maxLikes: 50,
+            maxSuperLikes: 1,
+          });
+        }
+      } else if (existingSwipe.action === 'pass') {
+        // If previously passed, allow changing to super like (undo pass)
+        // Check quota
+        if (dailyLimit && dailyLimit.superLikesCount >= dailyLimit.maxSuperLikes) {
+          throw new HttpException(
+            'Daily super like limit reached',
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+
+        // Update from pass to super like
+        existingSwipe.action = 'like';
+        existingSwipe.isSuperLike = true;
+        existingSwipe.timestamp = new Date();
+        await existingSwipe.save();
+
+        // Update quota
+        if (dailyLimit) {
+          dailyLimit.superLikesCount += 1;
+          await dailyLimit.save();
+        } else {
+          await this.dailyLimitModel.create({
+            userId,
+            date: today,
+            likesCount: 0,
+            superLikesCount: 1,
+            maxLikes: 50,
+            maxSuperLikes: 1,
+          });
+        }
+      } else {
+        throw new BadRequestException('Already swiped on this user');
+      }
     } else {
-      // Create new daily limit entry
-      await this.dailyLimitModel.create({
+      // Check quota for new super like
+      if (dailyLimit) {
+        if (dailyLimit.superLikesCount >= dailyLimit.maxSuperLikes) {
+          throw new HttpException(
+            'Daily super like limit reached',
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+        dailyLimit.superLikesCount += 1;
+        await dailyLimit.save();
+      } else {
+        await this.dailyLimitModel.create({
+          userId,
+          date: today,
+          likesCount: 0,
+          superLikesCount: 1,
+          maxLikes: 50,
+          maxSuperLikes: 1,
+        });
+      }
+
+      await this.checkNotBlocked(userId, targetUserId);
+
+      // Create new super like swipe
+      await this.swipeModel.create({
         userId,
-        date: today,
-        likesCount: 0,
-        superLikesCount: 1,
-        maxLikes: 50,
-        maxSuperLikes: 1, // Default for free users
+        targetUserId,
+        action: 'like',
+        timestamp: new Date(),
+        isSuperLike: true,
       });
     }
-
-    // Create swipe with super like flag
-    await this.swipeModel.create({
-      userId,
-      targetUserId,
-      action: 'like',
-      timestamp: new Date(),
-      isSuperLike: true, // Note: May need to add this field to Swipe model
-    });
 
     // Check for reciprocal like
     const reciprocalLike = await this.swipeModel.findOne({
@@ -271,16 +558,36 @@ export class DiscoveryService {
       return ResponseTransformer.toMatchResult(false, null, null);
     }
 
+    // Check if match already exists
+    const existingMatch = await this.matchModel.findOne({
+      $or: [
+        { userId, targetUserId, status: 'active' },
+        { userId: targetUserId, targetUserId: userId, status: 'active' },
+      ],
+    });
+
+    if (existingMatch) {
+      // Match already exists, return it
+      const targetPhotos = await this.photoService.getUserPhotos(targetUserId);
+      return ResponseTransformer.toMatchResult(true, existingMatch, targetProfile, targetPhotos);
+    }
+
     // Create match
     const match = await this.matchModel.create({
       userId,
       targetUserId,
-      status: 'matched',
+      status: 'active',
       matchedAt: new Date(),
       // createdAt auto-generated by timestamps: true
     });
 
-    return ResponseTransformer.toMatchResult(true, match, targetProfile);
+    // Fetch photos for target profile
+    const targetPhotos = await this.photoService.getUserPhotos(targetUserId);
+
+    // Send match notifications to both users
+    await this.sendMatchNotification(userId, targetUserId, match);
+
+    return ResponseTransformer.toMatchResult(true, match, targetProfile, targetPhotos);
   }
 
   /**
@@ -321,8 +628,8 @@ export class DiscoveryService {
     // If there's a match, unmatch them
     const existingMatch = await this.matchModel.findOne({
       $or: [
-        { userId, targetUserId, status: 'matched' },
-        { userId: targetUserId, targetUserId: userId, status: 'matched' },
+        { userId, targetUserId, status: 'active' },
+        { userId: targetUserId, targetUserId: userId, status: 'active' },
       ],
     });
 
@@ -347,7 +654,7 @@ export class DiscoveryService {
       this.matchModel
         .find({
           $or: [{ userId }, { targetUserId: userId }],
-          status: 'matched',
+          status: 'active',
         })
         .sort({ matchedAt: -1 })
         .skip(skip)
@@ -355,7 +662,7 @@ export class DiscoveryService {
         .exec(),
       this.matchModel.countDocuments({
         $or: [{ userId }, { targetUserId: userId }],
-        status: 'matched',
+        status: 'active',
       }),
     ]);
 
@@ -367,8 +674,9 @@ export class DiscoveryService {
       const otherProfile = await this.profileModel.findOne({ userId: otherUserId });
 
       if (otherProfile) {
+        const otherPhotos = await this.photoService.getUserPhotos(otherUserId);
         matchResponses.push(
-          ResponseTransformer.toMatchResponse(match, otherProfile, userId),
+          ResponseTransformer.toMatchResponse(match, otherProfile, userId, otherPhotos),
         );
       }
     }
@@ -385,6 +693,11 @@ export class DiscoveryService {
    * Get single match by ID
    */
   async getMatchById(matchId: string, userId: string): Promise<MatchResponseDto> {
+    // Validate matchId is a valid ObjectId
+    if (!matchId || !/^[0-9a-fA-F]{24}$/.test(matchId)) {
+      throw new BadRequestException('Invalid match ID format');
+    }
+
     const match = await this.matchModel.findById(matchId);
 
     if (!match) {
@@ -403,7 +716,8 @@ export class DiscoveryService {
       throw new NotFoundException('Matched user profile not found');
     }
 
-    return ResponseTransformer.toMatchResponse(match, otherProfile, userId);
+    const otherPhotos = await this.photoService.getUserPhotos(otherUserId);
+    return ResponseTransformer.toMatchResponse(match, otherProfile, userId, otherPhotos);
   }
 
   /**
@@ -421,7 +735,7 @@ export class DiscoveryService {
       throw new BadRequestException('Not authorized to unmatch');
     }
 
-    if (match.status !== 'matched') {
+    if (match.status !== 'active') {
       throw new BadRequestException('Match is not active');
     }
 

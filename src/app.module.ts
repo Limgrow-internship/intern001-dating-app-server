@@ -8,6 +8,7 @@ import { UserModule } from './modules/user.modules';
 import { ProfileModule } from './modules/profile.module';
 import { RecommendationModule } from './modules/recommendation.module';
 import { AIModule } from './modules/ai.module';
+import { PhotoModule } from './modules/photo.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { AIModule } from './modules/ai.module';
     AuthModule,
     UserModule,
     ProfileModule,
+    PhotoModule,
     RecommendationModule,
     AIModule,
   ],

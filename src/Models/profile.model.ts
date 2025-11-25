@@ -29,15 +29,6 @@ export class Profile {
     @Prop()
     bio?: string;
 
-    @Prop()
-    profilePicture?: string;
-
-    @Prop()
-    avatar?: string; // Primary photo URL
-
-    @Prop({ type: [String], default: [] })
-    photos?: string[]; // Array of photo URLs
-
     @Prop({ type: [String], default: [] })
     interests: string[];
 
@@ -62,9 +53,6 @@ export class Profile {
     @Prop()
     verifiedAt?: Date;
 
-    @Prop()
-    selfieImage?: string; 
-
     @Prop({ default: false })
     verifiedBadge?: boolean;
 
@@ -84,7 +72,7 @@ export class Profile {
     @Prop({ type: Number, min: 120, max: 220 })
     height?: number; // in centimeters
 
-    @Prop({ type: Number, min: 30, max: 200 })
+    @Prop({ type: Number, min: 30, max: 300 })
     weight?: number; // in kilograms
 
     @Prop()
@@ -98,6 +86,15 @@ export class Profile {
 
     @Prop({ type: Number, default: 0 })
     profileViews?: number;
+
+    @Prop({ type: [String], default: [] })
+    goals?: string[]; // Goals/objectives
+
+    @Prop()
+    job?: string; // Job title
+
+    @Prop({ type: Object })
+    openQuestionAnswers?: Record<string, string>; // Answers to open questions
 }
 
 export const ProfileSchema = SchemaFactory.createForClass(Profile);

@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { AIRouterService } from './ai-router.service';
 import { Profile, ProfileDocument } from '../Models/profile.model';
 import { Match, MatchDocument } from '../Models/match.model';
+import { PhotoService } from './photo.service';
 
 @Injectable()
 export class AIFeaturesService {
@@ -11,6 +12,7 @@ export class AIFeaturesService {
     private aiRouter: AIRouterService,
     @InjectModel(Profile.name) private profileModel: Model<ProfileDocument>,
     @InjectModel(Match.name) private matchModel: Model<MatchDocument>,
+    private photoService: PhotoService,
   ) {}
 
   /**
@@ -69,6 +71,10 @@ Conversation starter:`;
       throw new Error('Profile not found');
     }
 
+    // Check if user has photos via Photo service
+    const photos = await this.photoService.getUserPhotos(userId);
+    const hasPhotos = photos && photos.length > 0;
+
     const prompt = `Analyze this dating profile and provide 3 specific, actionable tips to improve it.
 
 Profile:
@@ -77,7 +83,7 @@ Profile:
 - Gender: ${profile.gender || 'Not set'}
 - Bio: ${profile.bio || 'Empty bio'}
 - Interests: ${profile.interests?.join(', ') || 'No interests listed'}
-- Has profile picture: ${profile.profilePicture ? 'Yes' : 'No'}
+- Has profile picture: ${hasPhotos ? 'Yes' : 'No'}
 
 Provide exactly 3 tips in this format:
 1. [Specific tip]

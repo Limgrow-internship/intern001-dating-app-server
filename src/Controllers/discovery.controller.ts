@@ -36,7 +36,7 @@ import {
 } from '../DTO/match-list-response.dto';
 
 @ApiTags('Discovery')
-@Controller('api/discovery')
+@Controller('discovery')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class DiscoveryController {
@@ -219,7 +219,7 @@ export class DiscoveryController {
     );
   }
 
-  @Get(':matchId')
+  @Get('match/:matchId')
   @ApiOperation({
     summary: 'Get match by ID',
     description: 'Get details of a specific match',

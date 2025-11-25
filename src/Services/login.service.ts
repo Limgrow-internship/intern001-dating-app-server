@@ -10,6 +10,8 @@ import { UserService } from '../Services/user.service';
 import { Profile, ProfileDocument } from '../Models/profile.model';
 import axios from 'axios';
 import { CloudinaryService } from '../Services/cloudinary.service';
+import { PhotoService } from '../Services/photo.service';
+import { PhotoType, PhotoSource } from '../Models/photo.model';
 
 @Injectable()
 export class AuthService {
@@ -22,14 +24,15 @@ export class AuthService {
     private jwt: JwtService,
     private userService: UserService,
     private jwtService: JwtService,
-    private readonly cloudinaryService: CloudinaryService
+    private readonly cloudinaryService: CloudinaryService,
+    private readonly photoService: PhotoService,
   ) { }
 
   private async findByEmail(email: string): Promise<UserDocument | null> {
     return this.userModel.findOne({ email }).exec();
   }
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, deviceToken?: string) {
     const user = await this.findByEmail(email);
     if (!user) {
       throw new UnauthorizedException('Email không tồn tại');
@@ -42,6 +45,30 @@ export class AuthService {
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
       throw new UnauthorizedException('Mật khẩu không đúng');
+    }
+
+    // Update last login and FCM token if deviceToken is provided
+    const updateData: any = {
+      lastLogin: new Date()
+    };
+
+    if (deviceToken) {
+      updateData.fcmToken = deviceToken;
+      updateData.fcmTokenUpdatedAt = new Date();
+    }
+
+    if (Object.keys(updateData).length > 1 || updateData.lastLogin) {
+      await this.userModel.updateOne({ id: user.id }, { $set: updateData }).exec();
+    }
+
+    // Ensure profile exists (create if it doesn't)
+    const existingProfile = await this.profileModel.findOne({ userId: user.id }).exec();
+    if (!existingProfile) {
+      await this.profileModel.create({
+        userId: user.id,
+        interests: [],
+        mode: 'dating',
+      });
     }
 
     const accessToken = this.jwt.sign(
@@ -87,17 +114,6 @@ export class AuthService {
     const name = payload.name || '';
     const picture = payload.picture || null;
 
-    let cloudinaryAvatar: string | null = null;
-    if (picture) {
-      try {
-        cloudinaryAvatar = await this.cloudinaryService.uploadImage(picture);
-        console.log("[GoogleLogin] Uploaded avatar:", cloudinaryAvatar);
-      } catch (err) {
-        console.error("[GoogleLogin] Cloudinary upload error:", err);
-      }
-    }
-
-
     let firstName = '';
     let lastName = '';
     if (name) {
@@ -123,27 +139,41 @@ export class AuthService {
       isNewUser = true;
     }
 
+    // Create or update profile (without photo fields)
     if (isNewUser) {
       await this.profileModel.create({
         userId: user.id,
         firstName,
         lastName,
-        avatar: cloudinaryAvatar,
       });
     } else {
-      const updateResult = await this.profileModel.updateOne(
+      await this.profileModel.updateOne(
         { userId: user.id },
         {
           $set: {
             firstName,
             lastName,
-            profilePicture: cloudinaryAvatar,
           }
         },
         { upsert: true }
       );
+    }
 
-      console.log("[GoogleLogin] profile update result:", updateResult);
+    // Upload avatar to Photos collection using PhotoService
+    let photoUrl: string | null = null;
+    if (picture) {
+      try {
+        const photo = await this.photoService.uploadFromUrl(
+          user.id,
+          picture,
+          PhotoSource.GOOGLE,
+          PhotoType.AVATAR,
+        );
+        photoUrl = photo.url;
+        console.log("[GoogleLogin] Uploaded avatar to Photos:", photoUrl);
+      } catch (err) {
+        console.error("[GoogleLogin] Photo upload error:", err);
+      }
     }
 
     const profile = await this.profileModel.findOne({ userId: user.id }).exec();
@@ -158,6 +188,10 @@ export class AuthService {
       { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' },
     );
 
+    // Get primary photo URL for response
+    const primaryPhoto = await this.photoService.getPrimaryPhoto(user.id);
+    const avatarUrl = primaryPhoto?.url || photoUrl;
+
     return {
       user: {
         id: user.id,
@@ -167,7 +201,7 @@ export class AuthService {
         ? {
           firstName: profile.firstName,
           lastName: profile.lastName,
-          profilePicture: cloudinaryAvatar || profile.profilePicture,
+          avatar: avatarUrl,
         }
         : {},
       accessToken: accessTokenJwt,
@@ -182,7 +216,7 @@ export class AuthService {
       fbRes = await axios.get('https://graph.facebook.com/me', {
         params: {
           access_token: accessToken,
-          fields: 'id,email,name,picture'
+          fields: 'id,email,name,picture.type(large)'
         }
       });
     } catch {
@@ -200,6 +234,15 @@ export class AuthService {
       const parts = fbData.name.split(' ');
       firstName = parts[0];
       lastName = parts.slice(1).join(' ');
+    }
+
+    let cloudinaryAvatar: string | null = null;
+    const pictureUrl = fbData.picture?.data?.url;
+    if (pictureUrl) {
+      try {
+        cloudinaryAvatar = await this.cloudinaryService.uploadImage(pictureUrl);
+      } catch (err) {
+      }
     }
 
     let user = await this.userModel.findOne({ facebookId: fbData.id }).exec();
@@ -222,7 +265,6 @@ export class AuthService {
         userId: user.id,
         firstName,
         lastName,
-        // profilePicture: fbData.picture?.data?.url
       });
     } else {
       await this.profileModel.updateOne(
@@ -230,14 +272,29 @@ export class AuthService {
         {
           $set: {
             firstName, lastName,
-            // 
           }
         },
         { upsert: true }
       );
     }
 
+    // Upload avatar to Photos collection if available
+    if (cloudinaryAvatar) {
+      try {
+        await this.photoService.uploadFromUrl(
+          user.id,
+          cloudinaryAvatar,
+          PhotoSource.FACEBOOK,
+          PhotoType.AVATAR,
+        );
+      } catch (err) {
+        console.error("[FacebookLogin] Photo upload error:", err);
+      }
+    }
+
     const profile = await this.profileModel.findOne({ userId: user.id }).exec();
+    const primaryPhoto = await this.photoService.getPrimaryPhoto(user.id);
+    const avatarUrl = primaryPhoto?.url || cloudinaryAvatar;
 
     const accessTokenJwt = this.jwt.sign(
       { userId: user.id, email: user.email },
@@ -256,7 +313,7 @@ export class AuthService {
       profile: profile ? {
         firstName: profile.firstName,
         lastName: profile.lastName,
-        // profilePicture: profile.profilePicture
+        avatar: avatarUrl,
       } : {},
       accessToken: accessTokenJwt,
       refreshToken: refreshTokenJwt,

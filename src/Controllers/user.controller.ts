@@ -3,6 +3,7 @@ import { UserService } from '../Services/user.service';
 import { CreateUserDto } from '../DTO/create-user.dto';
 import { VerifyOtpDto } from '../DTO/verify-otp.dto';
 import { ChangePasswordDto } from '../DTO/change-password.dto';
+import { UpdateFcmTokenDto } from '../DTO/fcm-token.dto';
 import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
@@ -68,5 +69,31 @@ export class UsersController {
         const userId = req.user.userId;
         await this.userService.deleteAccount(userId);
         return { message: "Your account has been deleted successfully!" };
+    }
+
+    @Put('fcm-token')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({
+        summary: 'Update FCM Token',
+        description: 'Update Firebase Cloud Messaging token for push notifications',
+    })
+    @ApiResponse({ status: 200, description: 'FCM token updated successfully' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    async updateFcmToken(@Request() req, @Body() dto: UpdateFcmTokenDto) {
+        return this.userService.updateFcmToken(req.user.userId, dto.fcmToken);
+    }
+
+    @Get('fcm-token')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({
+        summary: 'Get FCM Token',
+        description: 'Get current FCM token for the authenticated user',
+    })
+    @ApiResponse({ status: 200, description: 'FCM token retrieved successfully' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    async getFcmToken(@Request() req) {
+        return this.userService.getFcmToken(req.user.userId);
     }
 }

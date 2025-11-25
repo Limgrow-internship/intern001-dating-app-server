@@ -8,14 +8,19 @@ import { Match, MatchSchema } from '../Models/match.model';
 import { Preference, PreferenceSchema } from '../Models/preference.model';
 import { BlockedUser, BlockedUserSchema } from '../Models/blocked-user.model';
 import { DailyLimit, DailyLimitSchema } from '../Models/daily-limit.model';
+import { Conversation, ConversationSchema } from '../Models/conversation.model';
+import { User, UserSchema } from '../Models/user.model';
 import { RecommendationService } from '../Services/recommendation.service';
 import { MatchService } from '../Services/match.service';
+import { MatchActionService } from '../Services/match-action.service';
 import { DiscoveryService } from '../Services/discovery.service';
 import { PreferenceService } from '../Services/preference.service';
 import { RecommendationController } from '../Controllers/recommendation.controller';
 import { MatchController } from '../Controllers/match.controller';
 import { DiscoveryController } from '../Controllers/discovery.controller';
 import { PreferenceController } from '../Controllers/preference.controller';
+import { PhotoModule } from './photo.module';
+import { FcmService } from '../Services/fcm.service';
 
 @Module({
   imports: [
@@ -26,6 +31,8 @@ import { PreferenceController } from '../Controllers/preference.controller';
       { name: Preference.name, schema: PreferenceSchema },
       { name: BlockedUser.name, schema: BlockedUserSchema },
       { name: DailyLimit.name, schema: DailyLimitSchema },
+      { name: Conversation.name, schema: ConversationSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -35,6 +42,7 @@ import { PreferenceController } from '../Controllers/preference.controller';
       }),
       inject: [ConfigService],
     }),
+    PhotoModule,
   ],
   controllers: [
     RecommendationController,
@@ -45,14 +53,18 @@ import { PreferenceController } from '../Controllers/preference.controller';
   providers: [
     RecommendationService,
     MatchService,
+    MatchActionService,
     DiscoveryService,
     PreferenceService,
+    FcmService,
   ],
   exports: [
     RecommendationService,
     MatchService,
+    MatchActionService,
     DiscoveryService,
     PreferenceService,
+    FcmService,
   ],
 })
 export class RecommendationModule { }
