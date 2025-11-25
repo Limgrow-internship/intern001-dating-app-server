@@ -25,15 +25,6 @@ import { Profile, ProfileSchema } from 'src/Models/profile.model';
     CloudinaryModule,
   ],
   controllers: [PhotoController,
-    // VerifyController
-  ],
-  providers: [PhotoService,
-    // VerifyService
-  ],
-  exports: [PhotoService,
-    // VerifyService
-  ],
-  controllers: [PhotoController,
     //  VerifyController
   ], // VerifyController is temporarily disabled but kept to prevent module errors
   providers: [PhotoService,
