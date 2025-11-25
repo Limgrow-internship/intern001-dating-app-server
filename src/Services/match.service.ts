@@ -94,7 +94,7 @@ export class MatchService {
     const match = await this.matchModel.create({
       userId,
       targetUserId,
-      status: 'matched',
+      status: 'active',
       matchedAt: new Date(),
     });
 
@@ -107,7 +107,7 @@ export class MatchService {
     const matches = await this.matchModel
       .find({
         $or: [{ userId }, { targetUserId: userId }],
-        status: 'matched',
+        status: 'active',
       })
       .sort({ matchedAt: -1 })
       .exec();
@@ -142,8 +142,8 @@ export class MatchService {
   ): Promise<{ success: boolean }> {
     const match = await this.matchModel.findOne({
       $or: [
-        { userId, targetUserId, status: 'matched' },
-        { userId: targetUserId, targetUserId: userId, status: 'matched' },
+        { userId, targetUserId, status: 'active' },
+        { userId: targetUserId, targetUserId: userId, status: 'active' },
       ],
     });
 
@@ -177,8 +177,8 @@ export class MatchService {
       this.swipeModel.findOne({ userId: targetUserId, targetUserId: userId }),
       this.matchModel.findOne({
         $or: [
-          { userId, targetUserId, status: 'matched' },
-          { userId: targetUserId, targetUserId: userId, status: 'matched' },
+          { userId, targetUserId, status: 'active' },
+          { userId: targetUserId, targetUserId: userId, status: 'active' },
         ],
       }),
     ]);

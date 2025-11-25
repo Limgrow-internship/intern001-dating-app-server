@@ -55,6 +55,12 @@ export class User {
     @Prop({ type: [String], default: [] })
     deviceTokens: string[];
 
+    @Prop()
+    fcmToken?: string;
+
+    @Prop()
+    fcmTokenUpdatedAt?: Date;
+
     @Prop({ type: Array, default: [] })
     passwordHistory: Array<{
         changedAt: Date;

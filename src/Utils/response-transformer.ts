@@ -112,12 +112,22 @@ export class ResponseTransformer {
     currentUserId: string,
     photos?: Photo[],
   ): MatchResponseDto {
+    // Map database status to DTO status
+    let status: MatchStatus;
+    if (match.status === 'active') {
+      status = MatchStatus.MATCHED;
+    } else if (match.status === 'unmatched') {
+      status = MatchStatus.UNMATCHED;
+    } else {
+      status = match.status as MatchStatus;
+    }
+
     return {
       id: (match._id as any).toString(),
       userId: currentUserId,
       matchedUserId: match.userId === currentUserId ? match.targetUserId : match.userId,
       matchedUser: this.toUserProfileResponse(matchedUserProfile, photos),
-      status: match.status as MatchStatus,
+      status,
       createdAt: (match as any).createdAt?.toISOString() || new Date().toISOString(),
       matchedAt: match.matchedAt?.toISOString() || null,
     };

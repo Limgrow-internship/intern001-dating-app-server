@@ -24,6 +24,8 @@ import { PhotoModule } from './photo.module';
   providers: [ProfileService, JwtAuthGuard,
     // VerifyService
   ],
+  controllers: [ProfileController],
+  providers: [ProfileService, JwtAuthGuard],
   exports: [ProfileService, MongooseModule],
 })
 export class ProfileModule { }

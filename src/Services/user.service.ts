@@ -264,4 +264,32 @@ export class UserService {
         const newUser = new this.userModel(userData);
         return newUser.save();
     }
+
+    async updateFcmToken(userId: string, fcmToken: string) {
+        const user = await this.userModel.findOne({ id: userId });
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        await this.userModel.updateOne(
+            { id: userId },
+            {
+                $set: {
+                    fcmToken,
+                    fcmTokenUpdatedAt: new Date(),
+                },
+            },
+        ).exec();
+
+        return { message: 'FCM token updated successfully', fcmToken };
+    }
+
+    async getFcmToken(userId: string) {
+        const user = await this.userModel.findOne({ id: userId }).select('fcmToken');
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        return { fcmToken: user.fcmToken || null };
+    }
 }
