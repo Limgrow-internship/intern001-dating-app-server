@@ -12,6 +12,11 @@ export class UpdateProfileDto {
     @IsString()
     lastName?: string;
 
+    @ApiPropertyOptional({ description: 'Custom display name' })
+    @IsOptional()
+    @IsString()
+    displayName?: string;
+
     @ApiPropertyOptional({ description: 'Date of birth in ISO format' })
     @IsOptional()
     @IsDateString()
@@ -77,6 +82,18 @@ export class UpdateProfileDto {
     })
     @IsIn(['dating', 'friend'])
     mode?: string;
+
+    @ApiPropertyOptional({ description: 'Mode: serious or casual or friendship', enum: ['serious', 'casual', 'friendship'] })
+    @IsOptional()
+    @IsString()
+    @Transform(({ value }) => {
+        if (value === 'Serious Mode') return 'serious';
+        if (value === 'Casual Mode') return 'casual';
+        if (value === 'Friendship Mode') return 'friendship';
+        return value;
+    })
+    @IsIn(['serious', 'casual', 'friendship'])
+    relationshipMode?: string;
 
     @ApiPropertyOptional({ description: 'Occupation of the user' })
     @IsOptional()
@@ -171,5 +188,4 @@ export class UpdateProfileDto {
         return [];
     })
     photos?: string[];
-
 }

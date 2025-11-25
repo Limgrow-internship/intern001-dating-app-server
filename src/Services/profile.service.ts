@@ -82,6 +82,8 @@ export class ProfileService {
         }
 
         const updateData: any = { ...updateProfileDto };
+
+        // Handle location
         if (updateProfileDto.location) {
             const loc = updateProfileDto.location;
             if (typeof loc === 'object' && 'longitude' in loc && 'latitude' in loc) {
@@ -94,7 +96,7 @@ export class ProfileService {
             }
         }
 
-        // Handle profilePicture - upload to Photo collection if provided
+        // Handle profilePicture
         if (updateProfileDto.profilePicture) {
             try {
                 await this.photoService.uploadFromUrl(
@@ -103,31 +105,36 @@ export class ProfileService {
                     PhotoSource.UPLOAD,
                     PhotoType.AVATAR,
                 );
-                // Set as primary photo
                 const photos = await this.photoService.getUserPhotos(userId);
                 if (photos.length > 0) {
                     const latestPhoto = photos[photos.length - 1];
                     await this.photoService.setPrimaryPhoto(userId, (latestPhoto._id as any).toString());
                 }
-                console.log(`Uploaded profilePicture to Photo collection for userId: ${userId}`);
             } catch (error) {
-                console.error(`Failed to upload profilePicture for userId: ${userId}:`, error);
+                console.error(error);
             }
-            // Remove profilePicture from updateData as it's now handled by Photo service
             delete updateData.profilePicture;
         }
 
-        // Handle zodiac field - map zodiac to zodiacSign (Profile model uses zodiacSign)
-        if (updateProfileDto.zodiac) {
-            updateData.zodiacSign = updateProfileDto.zodiac;
-            delete updateData.zodiac;
+        // Map zodiac
+        if (updateProfileDto.zodiac) updateData.zodiacSign = updateProfileDto.zodiac;
+        if (updateProfileDto.zodiacSign) updateData.zodiacSign = updateProfileDto.zodiacSign;
+
+        // Map relationshipMode aliases
+        if (updateProfileDto.relationshipMode) {
+            const rm = updateProfileDto.relationshipMode;
+            if (rm === 'Serious Mode') updateData.relationshipMode = 'serious';
+            else if (rm === 'Casual Mode') updateData.relationshipMode = 'casual';
+            else if (rm === 'Friendship Mode') updateData.relationshipMode = 'friendship';
         }
-        // If zodiacSign is provided directly, use it (app sends zodiacSign)
-        if (updateProfileDto.zodiacSign) {
-            updateData.zodiacSign = updateProfileDto.zodiacSign;
-            delete updateData.zodiac; // Remove zodiac if exists to avoid conflict
-        }
+
+        // Update database
+        Object.assign(profile, updateData);
+        await profile.save();
+
+        return profile;
     }
+
 
     async deleteProfile(userId: string) {
         const result = await this.profileModel.deleteOne({ userId });
