@@ -22,9 +22,15 @@ export class UpdateProfileDto {
     @IsDateString()
     dateOfBirth?: string;
 
-    @ApiPropertyOptional({ description: 'Gender of the user', enum: ['male', 'female', 'other'] })
+    @ApiPropertyOptional({ description: 'Gender of the user', enum: ['male', 'female', 'other', 'Male', 'Female', 'Other'] })
     @IsOptional()
     @IsString()
+    @Transform(({ value }) => {
+        if (value === 'Male') return 'male';
+        if (value === 'Female') return 'female';
+        if (value === 'Other') return 'other';
+        return value;
+    })
     @IsIn(['male', 'female', 'other'])
     gender?: string;
 
@@ -151,11 +157,11 @@ export class UpdateProfileDto {
     @IsIn(['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'])
     zodiac?: string;
 
-    @ApiPropertyOptional({ description: 'Zodiac sign (alias for zodiac)', enum: ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'] })
-    @IsOptional()
-    @IsString()
-    @IsIn(['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'])
-    zodiacSign?: string;
+    // @ApiPropertyOptional({ description: 'Zodiac sign (alias for zodiac)', enum: ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'] })
+    // @IsOptional()
+    // @IsString()
+    // @IsIn(['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'])
+    // zodiacSign?: string;
 
     @ApiPropertyOptional({
         description: 'Answers to open questions',

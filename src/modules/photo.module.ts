@@ -6,8 +6,8 @@ import { Photo, PhotoSchema } from '../Models/photo.model';
 import { PhotoService } from '../Services/photo.service';
 import { PhotoController } from '../Controllers/photo.controller';
 import { CloudinaryModule } from './cloudinary.module';
-import { VerifyService } from 'src/Services/verify.service';
-import { VerifyController } from 'src/Controllers/verify.controller';
+// import { VerifyService } from 'src/Services/verify.service';
+// import { VerifyController } from 'src/Controllers/verify.controller';
 import { Profile, ProfileSchema } from 'src/Models/profile.model';
 
 @Module({
@@ -23,8 +23,14 @@ import { Profile, ProfileSchema } from 'src/Models/profile.model';
     }),
     CloudinaryModule,
   ],
-  controllers: [PhotoController, VerifyController],
-  providers: [PhotoService, VerifyService],
-  exports: [PhotoService, VerifyService],
+  controllers: [PhotoController,
+    // VerifyController
+  ],
+  providers: [PhotoService,
+    // VerifyService
+  ],
+  exports: [PhotoService,
+    // VerifyService
+  ],
 })
-export class PhotoModule {}
+export class PhotoModule { }

@@ -52,6 +52,7 @@ export class ProfileService {
 
         return {
             ...profile.toObject(),
+            openQuestionAnswers: profile.openQuestionAnswers || null,
             avatar: primaryPhoto?.url || null,
             photos: photos.map(p => ({
                 id: p._id,
@@ -118,7 +119,7 @@ export class ProfileService {
 
         // Map zodiac
         if (updateProfileDto.zodiac) updateData.zodiacSign = updateProfileDto.zodiac;
-        if (updateProfileDto.zodiacSign) updateData.zodiacSign = updateProfileDto.zodiacSign;
+        // if (updateProfileDto.zodiacSign) updateData.zodiacSign = updateProfileDto.zodiacSign;
 
         // Map relationshipMode aliases
         if (updateProfileDto.relationshipMode) {
@@ -128,10 +129,14 @@ export class ProfileService {
             else if (rm === 'Friendship Mode') updateData.relationshipMode = 'friendship';
         }
 
+        if (updateData.openQuestionAnswers) {
+            profile.openQuestionAnswers = updateData.openQuestionAnswers;
+            delete updateData.openQuestionAnswers;
+        }
+
         // Update database
         Object.assign(profile, updateData);
         await profile.save();
-
         return profile;
     }
 

@@ -77,7 +77,7 @@ export class Profile {
   weight?: number; // in kilograms
 
   @Prop()
-  zodiacSign?: string; // Aries, Taurus, etc.
+  zodiac?: string; // Aries, Taurus, etc.
 
   @Prop({ default: false })
   isVerified?: boolean;
@@ -95,7 +95,8 @@ export class Profile {
   job?: string; // Job title
 
   @Prop({ type: Object })
-  openQuestionAnswers?: Record<string, string>; // Answers to open questions
+  openQuestionAnswers?: Record<string, string>;
+
 }
 
 export const ProfileSchema = SchemaFactory.createForClass(Profile);

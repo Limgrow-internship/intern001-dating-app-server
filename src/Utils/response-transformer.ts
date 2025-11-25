@@ -30,9 +30,9 @@ export class ResponseTransformer {
   ): MatchCardResponseDto {
     const distance = userLocation && profile.location?.coordinates
       ? DistanceCalculator.calculateDistanceFromCoords(
-          userLocation.coordinates,
-          profile.location.coordinates,
-        )
+        userLocation.coordinates,
+        profile.location.coordinates,
+      )
       : null;
 
     // Transform photos from Photo collection
@@ -59,7 +59,7 @@ export class ResponseTransformer {
       interests: profile.interests || null,
       relationshipMode: profile.relationshipMode || profile.mode || null,
       height: profile.height || null,
-      zodiacSign: profile.zodiacSign || null,
+      zodiacSign: profile.zodiac || null,
       isVerified: profile.isVerified || null,
     };
   }
@@ -94,7 +94,7 @@ export class ResponseTransformer {
       occupation: profile.occupation || null,
       company: profile.company || null,
       education: profile.education || null,
-      zodiacSign: profile.zodiacSign || null,
+      zodiacSign: profile.zodiac || null,
       photos: photoDtos,
       profileCompleteness: profile.profileCompleteness || null,
       profileViews: profile.profileViews || null,
