@@ -151,17 +151,11 @@ export class UpdateProfileDto {
     @IsString()
     education?: string;
 
-    @ApiPropertyOptional({ description: 'Zodiac sign', enum: ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'] })
+    @ApiPropertyOptional({ description: 'Zodiac sign (alias for zodiac)', enum: ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'] })
     @IsOptional()
     @IsString()
     @IsIn(['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'])
-    zodiac?: string;
-
-    // @ApiPropertyOptional({ description: 'Zodiac sign (alias for zodiac)', enum: ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'] })
-    // @IsOptional()
-    // @IsString()
-    // @IsIn(['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'])
-    // zodiacSign?: string;
+    zodiacSign?: string;
 
     @ApiPropertyOptional({
         description: 'Answers to open questions',

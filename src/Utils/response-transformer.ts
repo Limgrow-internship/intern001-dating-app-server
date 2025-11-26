@@ -59,7 +59,7 @@ export class ResponseTransformer {
       interests: profile.interests || null,
       relationshipMode: profile.relationshipMode || profile.mode || null,
       height: profile.height || null,
-      zodiacSign: profile.zodiac || null,
+      zodiacSign: profile.zodiacSign || null,
       isVerified: profile.isVerified || null,
     };
   }
@@ -94,7 +94,7 @@ export class ResponseTransformer {
       occupation: profile.occupation || null,
       company: profile.company || null,
       education: profile.education || null,
-      zodiacSign: profile.zodiac || null,
+      zodiacSign: profile.zodiacSign || null,
       photos: photoDtos,
       profileCompleteness: profile.profileCompleteness || null,
       profileViews: profile.profileViews || null,

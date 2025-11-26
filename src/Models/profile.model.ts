@@ -77,7 +77,7 @@ export class Profile {
   weight?: number; // in kilograms
 
   @Prop()
-  zodiac?: string; // Aries, Taurus, etc.
+  zodiacSign?: string; // Aries, Taurus, etc.
 
   @Prop({ default: false })
   isVerified?: boolean;
