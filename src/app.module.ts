@@ -9,6 +9,7 @@ import { ProfileModule } from './modules/profile.module';
 import { RecommendationModule } from './modules/recommendation.module';
 import { AIModule } from './modules/ai.module';
 import { PhotoModule } from './modules/photo.module';
+import { ConversationModule } from './modules/conversation.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { PhotoModule } from './modules/photo.module';
     PhotoModule,
     RecommendationModule,
     AIModule,
+    ConversationModule,
   ],
 })
 export class AppModule { }
