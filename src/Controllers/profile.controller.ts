@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Put, Delete, UseGuards, Request, Query } from '@nestjs/common';
+import { Body, Controller, Get, Put, Delete, UseGuards, Request, Query, Param } from '@nestjs/common';
 import { ProfileService } from '../Services/profile.service';
 import { UpdateProfileDto } from '../DTO/update-profile.dto';
 import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { MatchCardResponseDto } from '../DTO/match-card-response.dto';
 
 @ApiTags('Profile')
 @Controller('profile')
@@ -98,5 +99,29 @@ export class ProfileController {
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     async getAllProfiles(@Query('mode') mode?: string, @Query('gender') gender?: string) {
         return this.profileService.getAllProfiles({ mode, gender });
+    }
+
+    @Get(':userId')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({
+        summary: 'Get Profile by User ID',
+        description: '🔒 Requires JWT token. Get profile of another user by userId. Returns profile in MatchCardResponse format with photos and distance calculation. Used for displaying profile card when user clicks on like notification.'
+    })
+    @ApiParam({ 
+        name: 'userId', 
+        description: 'User ID of the profile to retrieve',
+        example: 'user-uuid-here'
+    })
+    @ApiResponse({ 
+        status: 200, 
+        description: 'Profile retrieved successfully',
+        type: MatchCardResponseDto
+    })
+    @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
+    @ApiResponse({ status: 404, description: 'Profile not found' })
+    @ApiResponse({ status: 400, description: 'Cannot view profile - user is blocked' })
+    async getProfileById(@Param('userId') userId: string, @Request() req): Promise<MatchCardResponseDto> {
+        return this.profileService.getProfileById(userId, req.user.userId);
     }
 }

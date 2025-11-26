@@ -11,6 +11,8 @@ import { Conversation, ConversationDocument } from '../Models/conversation.model
 import { BlockedUser, BlockedUserDocument } from '../Models/blocked-user.model';
 import { DailyLimit, DailyLimitDocument } from '../Models/daily-limit.model';
 import { Preference, PreferenceDocument } from '../Models/preference.model';
+import { ResponseTransformer } from '../Utils/response-transformer';
+import { MatchCardResponseDto } from '../DTO/match-card-response.dto';
 
 @Injectable()
 export class ProfileService {
@@ -247,5 +249,43 @@ export class ProfileService {
         }
 
         return await this.profileModel.find(query).select('-__v');
+    }
+
+    /**
+     * Get profile by userId for displaying card (e.g., when user clicks on like notification)
+     * Returns profile in MatchCardResponse format
+     */
+    async getProfileById(targetUserId: string, currentUserId: string): Promise<MatchCardResponseDto> {
+        // Check if target user exists
+        const targetProfile = await this.profileModel.findOne({ userId: targetUserId });
+        if (!targetProfile) {
+            throw new NotFoundException('Profile not found');
+        }
+
+        // Check if users have blocked each other
+        const isBlocked = await this.blockedUserModel.findOne({
+            $or: [
+                { blockerUserId: currentUserId, blockedUserId: targetUserId },
+                { blockerUserId: targetUserId, blockedUserId: currentUserId },
+            ],
+        });
+
+        if (isBlocked) {
+            throw new BadRequestException('Cannot view profile - user is blocked');
+        }
+
+        // Get target user's photos
+        const photos = await this.photoService.getUserPhotos(targetUserId);
+
+        // Get current user's location for distance calculation
+        const currentUserProfile = await this.profileModel.findOne({ userId: currentUserId });
+        const userLocation = currentUserProfile?.location;
+
+        // Transform to MatchCardResponse format
+        return ResponseTransformer.toMatchCardResponse(
+            targetProfile,
+            userLocation,
+            photos,
+        );
     }
 }
