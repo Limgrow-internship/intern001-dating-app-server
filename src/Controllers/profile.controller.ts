@@ -60,10 +60,28 @@ export class ProfileController {
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
-        summary: 'Delete Profile',
-        description: '🔒 Requires JWT token. Delete profile from Profile collection.'
+        summary: '🗑️ Delete Profile and All Related Data',
+        description: '🔒 Requires JWT token. Permanently delete profile and all related data including: photos, swipes, matches, conversations, blocked users, daily limits, and preferences. This action cannot be undone!'
     })
-    @ApiResponse({ status: 200, description: 'Profile deleted successfully' })
+    @ApiResponse({ 
+        status: 200, 
+        description: 'Profile and all related data deleted successfully',
+        schema: {
+            example: {
+                message: 'Profile and all related data deleted successfully',
+                deleted: {
+                    profile: true,
+                    photos: true,
+                    swipes: true,
+                    matches: true,
+                    conversations: true,
+                    blockedUsers: true,
+                    dailyLimits: true,
+                    preferences: true,
+                }
+            }
+        }
+    })
     @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
     @ApiResponse({ status: 404, description: 'Profile not found' })
     async deleteProfile(@Request() req) {

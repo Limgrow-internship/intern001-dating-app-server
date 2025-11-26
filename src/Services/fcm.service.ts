@@ -78,6 +78,7 @@ export class FcmService implements OnModuleInit {
         token: targetFcmToken,
         data: {
           type: 'like',
+          targetUserId: targetUserId,
           likerId: likerId,
           likerName: likerName,
           title: 'New Like!',
@@ -192,15 +193,16 @@ export class FcmService implements OnModuleInit {
         token: targetFcmToken,
         data: {
           type: 'match',
+          targetUserId: targetUserId,
           matchId: matchId,
           matchedUserId: matchedUserId,
           matchedUserName: matchedUserName,
-          title: "It's a Match! 💕",
+          title: "It's a Match!",
           message: `You and ${matchedUserName} liked each other`,
           ...(matchedUserPhotoUrl && { matchedUserPhotoUrl: matchedUserPhotoUrl }),
         },
         notification: {
-          title: "It's a Match! 💕",
+          title: "It's a Match!",
           body: `You and ${matchedUserName} liked each other`,
         },
         android: {
