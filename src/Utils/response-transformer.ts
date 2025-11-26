@@ -30,9 +30,9 @@ export class ResponseTransformer {
   ): MatchCardResponseDto {
     const distance = userLocation && profile.location?.coordinates
       ? DistanceCalculator.calculateDistanceFromCoords(
-          userLocation.coordinates,
-          profile.location.coordinates,
-        )
+        userLocation.coordinates,
+        profile.location.coordinates,
+      )
       : null;
 
     // Transform photos from Photo collection

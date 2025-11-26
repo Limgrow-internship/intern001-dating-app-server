@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
+
 export type ProfileDocument = Profile & Document & {
   createdAt: Date;
   updatedAt: Date;
@@ -8,93 +9,94 @@ export type ProfileDocument = Profile & Document & {
 
 @Schema({ timestamps: true })
 export class Profile {
-    @Prop({ required: true, unique: true })
-    userId: string;
+  @Prop({ required: true, unique: true })
+  userId: string;
 
-    @Prop()
-    firstName?: string;
+  @Prop()
+  firstName?: string;
 
-    @Prop()
-    lastName?: string;
+  @Prop()
+  lastName?: string;
 
-    @Prop()
-    displayName?: string; // Custom display name
+  @Prop()
+  displayName?: string; // Custom display name
 
-    @Prop()
-    dateOfBirth?: Date;
+  @Prop()
+  dateOfBirth?: Date;
 
-    @Prop({ type: String, enum: ['male', 'female', 'other'] })
-    gender?: string;
+  @Prop({ type: String, enum: ['male', 'female', 'other'] })
+  gender?: string;
 
-    @Prop()
-    bio?: string;
+  @Prop()
+  bio?: string;
 
-    @Prop({ type: [String], default: [] })
-    interests: string[];
+  @Prop({ type: [String], default: [] })
+  interests: string[];
 
-    @Prop({ type: { type: String, coordinates: [Number] } })
-    location?: {
-        type: string;
-        coordinates: number[]; // [longitude, latitude] - GeoJSON format
-    };
+  @Prop({ type: { type: String, coordinates: [Number] } })
+  location?: {
+    type: string;
+    coordinates: number[]; // [longitude, latitude] - GeoJSON format
+  };
 
-    @Prop()
-    city?: string;
+  @Prop()
+  city?: string;
 
-    @Prop()
-    country?: string;
+  @Prop()
+  country?: string;
 
-    @Prop({ type: Number, min: 18, max: 100 })
-    age?: number;
+  @Prop({ type: Number, min: 18, max: 100 })
+  age?: number;
 
-    @Prop({ type: String, enum: ['dating', 'friend'], default: 'dating' })
-    mode?: string;
+  @Prop({ type: String, enum: ['dating', 'friend'], default: 'dating' })
+  mode?: string;
 
-    @Prop()
-    verifiedAt?: Date;
+  @Prop()
+  verifiedAt?: Date;
 
-    @Prop({ default: false })
-    verifiedBadge?: boolean;
+  @Prop({ default: false })
+  verifiedBadge?: boolean;
 
-    // New fields for Android compatibility
-    @Prop()
-    occupation?: string;
+  // New fields for Android compatibility
+  @Prop()
+  occupation?: string;
 
-    @Prop()
-    company?: string;
+  @Prop()
+  company?: string;
 
-    @Prop()
-    education?: string;
+  @Prop()
+  education?: string;
 
-    @Prop({ type: String, enum: ['serious', 'casual', 'friendship'] })
-    relationshipMode?: string;
+  @Prop({ type: String, enum: ['serious', 'casual', 'friendship'] })
+  relationshipMode?: string;
 
-    @Prop({ type: Number, min: 120, max: 220 })
-    height?: number; // in centimeters
+  @Prop({ type: Number, min: 120, max: 220 })
+  height?: number; // in centimeters
 
-    @Prop({ type: Number, min: 30, max: 300 })
-    weight?: number; // in kilograms
+  @Prop({ type: Number, min: 30, max: 300 })
+  weight?: number; // in kilograms
 
-    @Prop()
-    zodiacSign?: string; // Aries, Taurus, etc.
+  @Prop()
+  zodiacSign?: string; // Aries, Taurus, etc.
 
-    @Prop({ default: false })
-    isVerified?: boolean;
+  @Prop({ default: false })
+  isVerified?: boolean;
 
-    @Prop({ type: Number, min: 0, max: 100, default: 0 })
-    profileCompleteness?: number;
+  @Prop({ type: Number, min: 0, max: 100, default: 0 })
+  profileCompleteness?: number;
 
-    @Prop({ type: Number, default: 0 })
-    profileViews?: number;
+  @Prop({ type: Number, default: 0 })
+  profileViews?: number;
 
-    @Prop({ type: [String], default: [] })
-    goals?: string[]; // Goals/objectives
+  @Prop({ type: [String], default: [] })
+  goals?: string[]; // Goals/objectives
 
-    @Prop()
-    job?: string; // Job title
+  @Prop()
+  job?: string; // Job title
 
-    @Prop({ type: Object })
-    openQuestionAnswers?: Record<string, string>; // Answers to open questions
+  @Prop({ type: Map, of: String })
+  openQuestionAnswers?: Record<string, string>;
+
 }
 
 export const ProfileSchema = SchemaFactory.createForClass(Profile);

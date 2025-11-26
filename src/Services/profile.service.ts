@@ -52,6 +52,7 @@ export class ProfileService {
 
         return {
             ...profile.toObject(),
+            openQuestionAnswers: profile.openQuestionAnswers ?? {},
             avatar: primaryPhoto?.url || null,
             photos: photos.map(p => ({
                 id: p._id,
@@ -71,36 +72,33 @@ export class ProfileService {
     async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
         let profile = await this.profileModel.findOne({ userId });
 
-        // Auto-create profile if not exists (for users who signed up before profile feature)
         if (!profile) {
-            console.log(`Profile not found for userId: ${userId}, creating new profile...`);
             profile = new this.profileModel({
                 userId,
                 interests: [],
                 mode: 'dating',
+                photos: [],
+                openQuestionAnswers: {},
             });
             await profile.save();
-            console.log(`New profile created for userId: ${userId}`);
         }
 
-        // Prepare update data
         const updateData: any = { ...updateProfileDto };
 
-        // Handle location field - convert to GeoJSON format if provided
+        // Handle location
         if (updateProfileDto.location) {
-            if (typeof updateProfileDto.location === 'object' && 'longitude' in updateProfileDto.location && 'latitude' in updateProfileDto.location) {
-                // Convert { longitude, latitude } to GeoJSON format
+            const loc = updateProfileDto.location;
+            if (typeof loc === 'object' && 'longitude' in loc && 'latitude' in loc) {
                 updateData.location = {
                     type: 'Point',
-                    coordinates: [updateProfileDto.location.longitude, updateProfileDto.location.latitude]
+                    coordinates: [loc.longitude, loc.latitude]
                 };
             } else {
-                // If it's a string or invalid format, remove it from update to prevent geo index errors
                 delete updateData.location;
             }
         }
 
-        // Handle profilePicture - upload to Photo collection if provided
+        // Handle profilePicture
         if (updateProfileDto.profilePicture) {
             try {
                 await this.photoService.uploadFromUrl(
@@ -109,39 +107,41 @@ export class ProfileService {
                     PhotoSource.UPLOAD,
                     PhotoType.AVATAR,
                 );
-                // Set as primary photo
                 const photos = await this.photoService.getUserPhotos(userId);
                 if (photos.length > 0) {
                     const latestPhoto = photos[photos.length - 1];
                     await this.photoService.setPrimaryPhoto(userId, (latestPhoto._id as any).toString());
                 }
-                console.log(`Uploaded profilePicture to Photo collection for userId: ${userId}`);
             } catch (error) {
-                console.error(`Failed to upload profilePicture for userId: ${userId}:`, error);
+                console.error(error);
             }
-            // Remove profilePicture from updateData as it's now handled by Photo service
             delete updateData.profilePicture;
         }
 
-        // Handle zodiac field - map zodiac to zodiacSign (Profile model uses zodiacSign)
-        if (updateProfileDto.zodiac) {
-            updateData.zodiacSign = updateProfileDto.zodiac;
-            delete updateData.zodiac;
+        // Map zodiac
+        if (updateProfileDto.zodiacSign) updateData.zodiacSign = updateProfileDto.zodiacSign;
+
+        // Map relationshipMode aliases
+        if (updateProfileDto.relationshipMode) {
+            const rm = updateProfileDto.relationshipMode;
+            if (rm === 'Serious Mode') updateData.relationshipMode = 'serious';
+            else if (rm === 'Casual Mode') updateData.relationshipMode = 'casual';
+            else if (rm === 'Friendship Mode') updateData.relationshipMode = 'friendship';
         }
-        // If zodiacSign is provided directly, use it (app sends zodiacSign)
-        if (updateProfileDto.zodiacSign) {
-            updateData.zodiacSign = updateProfileDto.zodiacSign;
-            delete updateData.zodiac; // Remove zodiac if exists to avoid conflict
+        if (updateData.openQuestionAnswers) {
+            profile.openQuestionAnswers = updateData.openQuestionAnswers as Record<string, string>;
+            delete updateData.openQuestionAnswers;
         }
 
-        const updatedProfile = await this.profileModel.findOneAndUpdate(
-            { userId },
-            { $set: updateData },
-            { new: true }
-        );
 
-        return updatedProfile;
+
+        // Update database
+        Object.assign(profile, updateData);
+        await profile.save();
+        return profile;
     }
+
+
 
     async deleteProfile(userId: string) {
         const result = await this.profileModel.deleteOne({ userId });

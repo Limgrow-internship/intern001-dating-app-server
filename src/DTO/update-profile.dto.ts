@@ -1,7 +1,6 @@
 import { IsString, IsOptional, IsDateString, IsArray, IsNumber, Min, Max, IsIn } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-
 export class UpdateProfileDto {
     @ApiPropertyOptional({ description: 'First name of the user' })
     @IsOptional()
@@ -13,14 +12,25 @@ export class UpdateProfileDto {
     @IsString()
     lastName?: string;
 
+    @ApiPropertyOptional({ description: 'Custom display name' })
+    @IsOptional()
+    @IsString()
+    displayName?: string;
+
     @ApiPropertyOptional({ description: 'Date of birth in ISO format' })
     @IsOptional()
     @IsDateString()
     dateOfBirth?: string;
 
-    @ApiPropertyOptional({ description: 'Gender of the user', enum: ['male', 'female', 'other'] })
+    @ApiPropertyOptional({ description: 'Gender of the user', enum: ['male', 'female', 'other', 'Male', 'Female', 'Other'] })
     @IsOptional()
     @IsString()
+    @Transform(({ value }) => {
+        if (value === 'Male') return 'male';
+        if (value === 'Female') return 'female';
+        if (value === 'Other') return 'other';
+        return value;
+    })
     @IsIn(['male', 'female', 'other'])
     gender?: string;
 
@@ -79,6 +89,18 @@ export class UpdateProfileDto {
     @IsIn(['dating', 'friend'])
     mode?: string;
 
+    @ApiPropertyOptional({ description: 'Mode: serious or casual or friendship', enum: ['serious', 'casual', 'friendship'] })
+    @IsOptional()
+    @IsString()
+    @Transform(({ value }) => {
+        if (value === 'Serious Mode') return 'serious';
+        if (value === 'Casual Mode') return 'casual';
+        if (value === 'Friendship Mode') return 'friendship';
+        return value;
+    })
+    @IsIn(['serious', 'casual', 'friendship'])
+    relationshipMode?: string;
+
     @ApiPropertyOptional({ description: 'Occupation of the user' })
     @IsOptional()
     @IsString()
@@ -129,12 +151,6 @@ export class UpdateProfileDto {
     @IsString()
     education?: string;
 
-    @ApiPropertyOptional({ description: 'Zodiac sign', enum: ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'] })
-    @IsOptional()
-    @IsString()
-    @IsIn(['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'])
-    zodiac?: string;
-
     @ApiPropertyOptional({ description: 'Zodiac sign (alias for zodiac)', enum: ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'] })
     @IsOptional()
     @IsString()
@@ -148,4 +164,28 @@ export class UpdateProfileDto {
     })
     @IsOptional()
     openQuestionAnswers?: Record<string, string>;
+
+    @ApiPropertyOptional({
+        description: 'Array of photo URLs',
+        type: [String]
+    })
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    @Transform(({ value }) => {
+        if (!value) return [];
+
+        if (Array.isArray(value)) {
+            return value
+                .map((v: any) => {
+                    if (typeof v === 'string') return v.trim();
+                    if (v && typeof v === 'object' && typeof v.url === 'string') return v.url.trim();
+                    return null;
+                })
+                .filter((v): v is string => !!v); // loại bỏ null
+        }
+
+        return [];
+    })
+    photos?: string[];
 }
