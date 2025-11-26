@@ -52,7 +52,7 @@ export class ProfileService {
 
         return {
             ...profile.toObject(),
-            openQuestionAnswers: profile.openQuestionAnswers || null,
+            openQuestionAnswers: profile.openQuestionAnswers ?? {},
             avatar: primaryPhoto?.url || null,
             photos: photos.map(p => ({
                 id: p._id,
@@ -77,7 +77,8 @@ export class ProfileService {
                 userId,
                 interests: [],
                 mode: 'dating',
-                photos: []
+                photos: [],
+                openQuestionAnswers: {},
             });
             await profile.save();
         }
@@ -127,17 +128,19 @@ export class ProfileService {
             else if (rm === 'Casual Mode') updateData.relationshipMode = 'casual';
             else if (rm === 'Friendship Mode') updateData.relationshipMode = 'friendship';
         }
-
         if (updateData.openQuestionAnswers) {
-            profile.openQuestionAnswers = updateData.openQuestionAnswers;
+            profile.openQuestionAnswers = updateData.openQuestionAnswers as Record<string, string>;
             delete updateData.openQuestionAnswers;
         }
+
+
 
         // Update database
         Object.assign(profile, updateData);
         await profile.save();
         return profile;
     }
+
 
 
     async deleteProfile(userId: string) {

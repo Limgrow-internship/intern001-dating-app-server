@@ -94,7 +94,7 @@ export class Profile {
   @Prop()
   job?: string; // Job title
 
-  @Prop({ type: Object })
+  @Prop({ type: Map, of: String })
   openQuestionAnswers?: Record<string, string>;
 
 }
