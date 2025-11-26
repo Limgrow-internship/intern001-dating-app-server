@@ -11,6 +11,8 @@ import { Preference, PreferenceSchema } from '../Models/preference.model';
 import { ProfileService } from '../Services/profile.service';
 import { ProfileController } from '../Controllers/profile.controller';
 import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
+// import { VerifyController } from '../Controllers/verify.controller';
+// import { VerifyService } from '../Services/verify.service';
 import { PhotoModule } from './photo.module';
 
 @Module({
@@ -30,8 +32,12 @@ import { PhotoModule } from './photo.module';
     }),
     PhotoModule,
   ],
-  controllers: [ProfileController],
-  providers: [ProfileService, JwtAuthGuard],
+  controllers: [ProfileController,
+    // VerifyController
+  ],
+  providers: [ProfileService, JwtAuthGuard,
+    // VerifyService
+  ],
   exports: [ProfileService, MongooseModule],
 })
 export class ProfileModule { }
