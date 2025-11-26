@@ -15,7 +15,7 @@ export class ProfileController {
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
         summary: '6️⃣ Get Profile with Photos (NEW)',
-        description: '🔒 Requires JWT token. Get profile with photos from Photos collection. Returns avatar and photos array with metadata.'
+        description: 'Requires JWT token. Get profile with photos from Photos collection. Returns avatar and photos array with metadata.'
     })
     @ApiResponse({ status: 200, description: 'Profile retrieved successfully with photos' })
     @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
@@ -29,7 +29,7 @@ export class ProfileController {
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
         summary: '7️⃣ Update Profile (in Profile collection)',
-        description: '🔒 Requires JWT token. Update profile in separate Profile collection. This is the main UPDATE PROFILE endpoint!'
+        description: 'Requires JWT token. Update profile in separate Profile collection. This is the main UPDATE PROFILE endpoint!'
     })
     @ApiResponse({
         status: 200,
@@ -61,8 +61,8 @@ export class ProfileController {
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
-        summary: '🗑️ Delete Profile and All Related Data',
-        description: '🔒 Requires JWT token. Permanently delete profile and all related data including: photos, swipes, matches, conversations, blocked users, daily limits, and preferences. This action cannot be undone!'
+        summary: 'Delete Profile and All Related Data',
+        description: 'Requires JWT token. Permanently delete profile and all related data including: photos, swipes, matches, conversations, blocked users, daily limits, and preferences. This action cannot be undone!'
     })
     @ApiResponse({ 
         status: 200, 
@@ -106,7 +106,7 @@ export class ProfileController {
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
         summary: 'Get Profile by User ID',
-        description: '🔒 Requires JWT token. Get profile of another user by userId. Returns profile in MatchCardResponse format with photos and distance calculation. Used for displaying profile card when user clicks on like notification.'
+        description: 'Requires JWT token. Get profile of another user by userId. Returns profile in MatchCardResponse format with photos and distance calculation. Used for displaying profile card when user clicks on like notification.'
     })
     @ApiParam({ 
         name: 'userId', 
