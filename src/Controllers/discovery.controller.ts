@@ -47,6 +47,18 @@ export class DiscoveryController {
     summary: 'Get next match card',
     description: 'Get the next recommended profile card for swiping',
   })
+  @ApiQuery({
+    name: 'latitude',
+    required: false,
+    type: Number,
+    description: 'User current latitude from GPS',
+  })
+  @ApiQuery({
+    name: 'longitude',
+    required: false,
+    type: Number,
+    description: 'User current longitude from GPS',
+  })
   @ApiResponse({
     status: 200,
     description: 'Returns next match card',
@@ -54,9 +66,25 @@ export class DiscoveryController {
   })
   @ApiResponse({ status: 204, description: 'No more cards available' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getNextMatchCard(@Request() req): Promise<MatchCardResponseDto> {
+  async getNextMatchCard(
+    @Request() req,
+    @Query('latitude') latitude?: string,
+    @Query('longitude') longitude?: string,
+  ): Promise<MatchCardResponseDto> {
     const userId = req.user.userId;
-    const card = await this.discoveryService.getNextMatchCard(userId);
+
+    // Parse location from query params if provided
+    let userLocation: { coordinates: number[] } | undefined;
+    if (latitude && longitude) {
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        // GeoJSON format: [longitude, latitude]
+        userLocation = { coordinates: [lng, lat] };
+      }
+    }
+
+    const card = await this.discoveryService.getNextMatchCard(userId, userLocation);
 
     if (!card) {
       throw new HttpException('', HttpStatus.NO_CONTENT);
@@ -76,6 +104,18 @@ export class DiscoveryController {
     type: Number,
     description: 'Number of cards to return (default: 10, max: 20)',
   })
+  @ApiQuery({
+    name: 'latitude',
+    required: false,
+    type: Number,
+    description: 'User current latitude from GPS',
+  })
+  @ApiQuery({
+    name: 'longitude',
+    required: false,
+    type: Number,
+    description: 'User current longitude from GPS',
+  })
   @ApiResponse({
     status: 200,
     description: 'Returns batch of match cards',
@@ -85,11 +125,29 @@ export class DiscoveryController {
   async getMatchCards(
     @Request() req,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('latitude') latitude?: string,
+    @Query('longitude') longitude?: string,
   ): Promise<MatchCardsListResponseDto> {
     const userId = req.user.userId;
     const requestedLimit = Math.min(limit || 10, 20); // Max 20 cards
 
-    return this.discoveryService.getMatchCards(userId, requestedLimit);
+    // Parse location from query params if provided
+    let userLocation: { coordinates: number[] } | undefined;
+    if (latitude && longitude) {
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        // GeoJSON format: [longitude, latitude]
+        userLocation = { coordinates: [lng, lat] };
+        console.log(`[DiscoveryController] getMatchCards: Received location from query params - lat: ${lat}, lng: ${lng}`);
+      } else {
+        console.log(`[DiscoveryController] getMatchCards: Invalid location params - latitude: ${latitude}, longitude: ${longitude}`);
+      }
+    } else {
+      console.log(`[DiscoveryController] getMatchCards: No location in query params - latitude: ${latitude}, longitude: ${longitude}`);
+    }
+
+    return this.discoveryService.getMatchCards(userId, requestedLimit, userLocation);
   }
 
   @Post('like')
@@ -200,6 +258,18 @@ export class DiscoveryController {
     type: Number,
     description: 'Items per page (default: 20)',
   })
+  @ApiQuery({
+    name: 'latitude',
+    required: false,
+    type: Number,
+    description: 'User current latitude from GPS',
+  })
+  @ApiQuery({
+    name: 'longitude',
+    required: false,
+    type: Number,
+    description: 'User current longitude from GPS',
+  })
   @ApiResponse({
     status: 200,
     description: 'Returns paginated matches',
@@ -210,12 +280,27 @@ export class DiscoveryController {
     @Request() req,
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('latitude') latitude?: string,
+    @Query('longitude') longitude?: string,
   ): Promise<MatchesListResponseDto> {
     const userId = req.user.userId;
+
+    // Parse location from query params if provided
+    let userLocation: { coordinates: number[] } | undefined;
+    if (latitude && longitude) {
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        // GeoJSON format: [longitude, latitude]
+        userLocation = { coordinates: [lng, lat] };
+      }
+    }
+
     return this.discoveryService.getMatchesPaginated(
       userId,
       page || 1,
       limit || 20,
+      userLocation,
     );
   }
 
@@ -229,6 +314,18 @@ export class DiscoveryController {
     description: 'Match ID',
     example: 'match_789',
   })
+  @ApiQuery({
+    name: 'latitude',
+    required: false,
+    type: Number,
+    description: 'User current latitude from GPS',
+  })
+  @ApiQuery({
+    name: 'longitude',
+    required: false,
+    type: Number,
+    description: 'User current longitude from GPS',
+  })
   @ApiResponse({
     status: 200,
     description: 'Returns match details',
@@ -239,9 +336,23 @@ export class DiscoveryController {
   async getMatchById(
     @Request() req,
     @Param('matchId') matchId: string,
+    @Query('latitude') latitude?: string,
+    @Query('longitude') longitude?: string,
   ): Promise<MatchResponseDto> {
     const userId = req.user.userId;
-    return this.discoveryService.getMatchById(matchId, userId);
+
+    // Parse location from query params if provided
+    let userLocation: { coordinates: number[] } | undefined;
+    if (latitude && longitude) {
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        // GeoJSON format: [longitude, latitude]
+        userLocation = { coordinates: [lng, lat] };
+      }
+    }
+
+    return this.discoveryService.getMatchById(matchId, userId, userLocation);
   }
 
   @Post('unmatch')

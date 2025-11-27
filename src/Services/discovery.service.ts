@@ -45,7 +45,10 @@ export class DiscoveryService {
   /**
    * Get next match card based on recommendations
    */
-  async getNextMatchCard(userId: string): Promise<MatchCardResponseDto | null> {
+  async getNextMatchCard(
+    userId: string,
+    userLocation?: { coordinates: number[] },
+  ): Promise<MatchCardResponseDto | null> {
     // Get user profile for location
     let userProfile = await this.profileModel.findOne({ userId });
     if (!userProfile) {
@@ -56,6 +59,9 @@ export class DiscoveryService {
         mode: 'dating',
       });
     }
+
+    // Use location from query params if provided, otherwise fallback to profile location
+    const locationForDistance = userLocation || userProfile.location;
 
     // Get blocked users (both ways: users I blocked + users who blocked me)
     const blockedUserIds = await this.getBlockedUserIds(userId);
@@ -88,7 +94,7 @@ export class DiscoveryService {
     // Transform to Android DTO
     return ResponseTransformer.toMatchCardResponse(
       topCandidate,
-      userProfile.location,
+      locationForDistance,
       candidatePhotos,
     );
   }
@@ -99,6 +105,7 @@ export class DiscoveryService {
   async getMatchCards(
     userId: string,
     limit: number,
+    userLocation?: { coordinates: number[] },
   ): Promise<MatchCardsListResponseDto> {
     let userProfile = await this.profileModel.findOne({ userId });
     if (!userProfile) {
@@ -109,6 +116,15 @@ export class DiscoveryService {
         mode: 'dating',
       });
     }
+
+    // Use location from query params if provided, otherwise fallback to profile location
+    const locationForDistance = userLocation || userProfile.location;
+    
+    // Safe logging - check coordinates exist before accessing
+    const locStr = locationForDistance?.coordinates && locationForDistance.coordinates.length >= 2
+      ? `[${locationForDistance.coordinates[1]}, ${locationForDistance.coordinates[0]}]`
+      : 'null';
+    console.log(`[DiscoveryService] getMatchCards: userId=${userId}, locationForDistance: ${locStr} (from ${userLocation ? 'query params' : 'profile'})`);
 
     const blockedUserIds = await this.getBlockedUserIds(userId);
     const swipedUserIds = await this.swipeModel
@@ -130,15 +146,27 @@ export class DiscoveryService {
       )
       .slice(0, limit);
 
+    // Log statistics about candidate locations
+    const candidatesWithLocation = filteredRecs.filter(rec => 
+      rec.profile.location?.coordinates && rec.profile.location.coordinates.length >= 2
+    ).length;
+    console.log(`[DiscoveryService] getMatchCards: Total candidates: ${filteredRecs.length}, Candidates with location: ${candidatesWithLocation}, Candidates without location: ${filteredRecs.length - candidatesWithLocation}`);
+
     // Fetch photos for all candidates in parallel
     const cardsWithPhotos = await Promise.all(
       filteredRecs.map(async (rec) => {
         const photos = await this.photoService.getUserPhotos(rec.profile.userId);
-        return ResponseTransformer.toMatchCardResponse(
+        const card = ResponseTransformer.toMatchCardResponse(
           rec.profile,
-          userProfile.location,
+          locationForDistance,
           photos,
         );
+        // Safe logging - check coordinates exist before accessing
+        const candidateLocStr = rec.profile.location?.coordinates && rec.profile.location.coordinates.length >= 2
+          ? `[${rec.profile.location.coordinates[1]}, ${rec.profile.location.coordinates[0]}]`
+          : 'null';
+        console.log(`[DiscoveryService] getMatchCards: Card for userId=${rec.profile.userId}, distance=${card.distance}, distanceText=${card.distanceText}, candidateLocation: ${candidateLocStr}`);
+        return card;
       }),
     );
 
@@ -656,6 +684,7 @@ export class DiscoveryService {
     userId: string,
     page: number,
     limit: number,
+    userLocation?: { coordinates: number[] },
   ): Promise<MatchesListResponseDto> {
     const skip = (page - 1) * limit;
 
@@ -675,6 +704,13 @@ export class DiscoveryService {
       }),
     ]);
 
+    // Use location from query params if provided, otherwise get from profile
+    let currentUserLocation = userLocation;
+    if (!currentUserLocation) {
+      const currentUserProfile = await this.profileModel.findOne({ userId });
+      currentUserLocation = currentUserProfile?.location;
+    }
+
     // Transform each match to MatchResponseDto
     const matchResponses: MatchResponseDto[] = [];
 
@@ -685,7 +721,13 @@ export class DiscoveryService {
       if (otherProfile) {
         const otherPhotos = await this.photoService.getUserPhotos(otherUserId);
         matchResponses.push(
-          ResponseTransformer.toMatchResponse(match, otherProfile, userId, otherPhotos),
+          ResponseTransformer.toMatchResponse(
+            match,
+            otherProfile,
+            userId,
+            otherPhotos,
+            currentUserLocation,
+          ),
         );
       }
     }
@@ -701,7 +743,11 @@ export class DiscoveryService {
   /**
    * Get single match by ID
    */
-  async getMatchById(matchId: string, userId: string): Promise<MatchResponseDto> {
+  async getMatchById(
+    matchId: string,
+    userId: string,
+    userLocation?: { coordinates: number[] },
+  ): Promise<MatchResponseDto> {
     // Validate matchId is a valid ObjectId
     if (!matchId || !/^[0-9a-fA-F]{24}$/.test(matchId)) {
       throw new BadRequestException('Invalid match ID format');
@@ -725,8 +771,21 @@ export class DiscoveryService {
       throw new NotFoundException('Matched user profile not found');
     }
 
+    // Use location from query params if provided, otherwise get from profile
+    let currentUserLocation = userLocation;
+    if (!currentUserLocation) {
+      const currentUserProfile = await this.profileModel.findOne({ userId });
+      currentUserLocation = currentUserProfile?.location;
+    }
+
     const otherPhotos = await this.photoService.getUserPhotos(otherUserId);
-    return ResponseTransformer.toMatchResponse(match, otherProfile, userId, otherPhotos);
+    return ResponseTransformer.toMatchResponse(
+      match,
+      otherProfile,
+      userId,
+      otherPhotos,
+      currentUserLocation,
+    );
   }
 
   /**

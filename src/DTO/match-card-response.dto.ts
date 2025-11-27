@@ -56,8 +56,19 @@ export class MatchCardResponseDto {
   @ApiProperty({ description: 'User bio', example: 'Love hiking and coffee ☕', nullable: true })
   bio: string | null;
 
-  @ApiProperty({ description: 'Distance in kilometers', example: 5.2, nullable: true })
+  @ApiProperty({ 
+    description: 'Distance in kilometers (calculated from GPS coordinates)', 
+    example: 5.2, 
+    nullable: true 
+  })
   distance: number | null;
+
+  @ApiProperty({ 
+    description: 'Formatted distance text for display. Shows actual distance if both users have GPS, otherwise "Gần đây"', 
+    example: '5.2km', 
+    nullable: true 
+  })
+  distanceText: string | null;
 
   @ApiProperty({ description: 'Location details', type: LocationResponseDto, nullable: true })
   location: LocationResponseDto | null;

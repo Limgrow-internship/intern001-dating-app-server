@@ -90,33 +90,61 @@ export class ProfileService {
     }
 
     async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
-        let profile = await this.profileModel.findOne({ userId });
+        try {
+            let profile = await this.profileModel.findOne({ userId });
 
-        if (!profile) {
-            profile = new this.profileModel({
-                userId,
-                interests: [],
-                mode: 'dating',
-                photos: [],
-                openQuestionAnswers: {},
-            });
-            await profile.save();
-        }
-
-        const updateData: any = { ...updateProfileDto };
-
-        // Handle location
-        if (updateProfileDto.location) {
-            const loc = updateProfileDto.location;
-            if (typeof loc === 'object' && 'longitude' in loc && 'latitude' in loc) {
-                updateData.location = {
-                    type: 'Point',
-                    coordinates: [loc.longitude, loc.latitude]
-                };
-            } else {
-                delete updateData.location;
+            if (!profile) {
+                profile = new this.profileModel({
+                    userId,
+                    interests: [],
+                    mode: 'dating',
+                    photos: [],
+                    openQuestionAnswers: {},
+                });
+                await profile.save();
             }
-        }
+
+            const updateData: any = { ...updateProfileDto };
+
+            // Handle location
+            if (updateProfileDto.location) {
+                const loc = updateProfileDto.location;
+                // Check if location is already in GeoJSON format (has coordinates and type)
+                if (typeof loc === 'object' && 'coordinates' in loc && 'type' in loc && loc.type === 'Point') {
+                    const coordinates = loc.coordinates;
+                    if (Array.isArray(coordinates) && coordinates.length >= 2) {
+                        const longitude = typeof coordinates[0] === 'number' ? coordinates[0] : parseFloat(coordinates[0] as any);
+                        const latitude = typeof coordinates[1] === 'number' ? coordinates[1] : parseFloat(coordinates[1] as any);
+                        
+                        if (!isNaN(longitude) && !isNaN(latitude)) {
+                            updateData.location = {
+                                type: 'Point',
+                                coordinates: [longitude, latitude]
+                            };
+                        } else {
+                            delete updateData.location;
+                        }
+                    } else {
+                        delete updateData.location;
+                    }
+                }
+                // Check if location is in longitude/latitude format
+                else if (typeof loc === 'object' && 'longitude' in loc && 'latitude' in loc) {
+                    const longitude = typeof loc.longitude === 'number' ? loc.longitude : parseFloat(loc.longitude as any);
+                    const latitude = typeof loc.latitude === 'number' ? loc.latitude : parseFloat(loc.latitude as any);
+                    
+                    if (!isNaN(longitude) && !isNaN(latitude)) {
+                        updateData.location = {
+                            type: 'Point',
+                            coordinates: [longitude, latitude]
+                        };
+                    } else {
+                        delete updateData.location;
+                    }
+                } else {
+                    delete updateData.location;
+                }
+            }
 
         // Handle profilePicture
         if (updateProfileDto.profilePicture) {
@@ -133,7 +161,7 @@ export class ProfileService {
                     await this.photoService.setPrimaryPhoto(userId, (latestPhoto._id as any).toString());
                 }
             } catch (error) {
-                console.error(error);
+                // Ignore photo upload errors during profile update
             }
             delete updateData.profilePicture;
         }
@@ -153,12 +181,63 @@ export class ProfileService {
             delete updateData.openQuestionAnswers;
         }
 
-
-
-        // Update database
-        Object.assign(profile, updateData);
-        await profile.save();
-        return profile;
+            // Update database
+            // Handle location separately using direct MongoDB update to ensure proper GeoJSON format
+            const locationToSet = updateData.location;
+            if (locationToSet) {
+                // Validate location format
+                if (locationToSet.type === 'Point' && 
+                    locationToSet.coordinates &&
+                    Array.isArray(locationToSet.coordinates) &&
+                    locationToSet.coordinates.length >= 2 &&
+                    locationToSet.coordinates.every((coord: any) => coord !== null && coord !== undefined && !isNaN(coord))) {
+                    
+                    // Prepare valid location
+                    const validLocation = {
+                        type: 'Point',
+                        coordinates: [locationToSet.coordinates[0], locationToSet.coordinates[1]]
+                    };
+                    
+                    // Always use $set with raw MongoDB collection to bypass validation
+                    // $set will overwrite any existing location (valid or invalid)
+                    const collection = this.profileModel.collection;
+                await collection.updateOne(
+                        { userId },
+                        { $set: { location: validLocation } }
+                    );
+                    // Reload profile document to ensure we have the latest location before saving other fields
+                    profile = await this.profileModel.findOne({ userId });
+                    if (!profile) {
+                        throw new NotFoundException('Profile not found after setting location');
+                    }
+                    delete updateData.location;
+                } else {
+                    // Invalid location data - remove it
+                    delete updateData.location;
+                }
+            }
+            
+            // Remove null values to avoid overwriting existing data with null
+            Object.keys(updateData).forEach(key => {
+                if (updateData[key] !== null && updateData[key] !== undefined) {
+                    profile[key] = updateData[key];
+                }
+            });
+            
+            // Save other fields (location already saved above)
+            await profile.save();
+            
+            // Reload profile to get the latest data including location
+            // Need to reload because location was set via raw MongoDB collection
+            const updatedProfile = await this.profileModel.findOne({ userId });
+            if (!updatedProfile) {
+                throw new NotFoundException('Profile not found after update');
+            }
+            
+            return updatedProfile;
+        } catch (error) {
+            throw error;
+        }
     }
 
 
@@ -176,9 +255,7 @@ export class ProfileService {
             this.profileModel.deleteOne({ userId }),
             
             // Delete all photos
-            this.photoService.deleteAllUserPhotos(userId).catch(err => {
-                console.error(`Error deleting photos for user ${userId}:`, err);
-            }),
+            this.photoService.deleteAllUserPhotos(userId).catch(() => undefined),
             
             // Delete all swipes where user is the swiper or target
             this.swipeModel.deleteMany({
@@ -255,7 +332,11 @@ export class ProfileService {
      * Get profile by userId for displaying card (e.g., when user clicks on like notification)
      * Returns profile in MatchCardResponse format
      */
-    async getProfileById(targetUserId: string, currentUserId: string): Promise<MatchCardResponseDto> {
+    async getProfileById(
+        targetUserId: string, 
+        currentUserId: string,
+        userLocation?: { coordinates: number[] },
+    ): Promise<MatchCardResponseDto> {
         // Check if target user exists
         const targetProfile = await this.profileModel.findOne({ userId: targetUserId });
         if (!targetProfile) {
@@ -277,14 +358,17 @@ export class ProfileService {
         // Get target user's photos
         const photos = await this.photoService.getUserPhotos(targetUserId);
 
-        // Get current user's location for distance calculation
-        const currentUserProfile = await this.profileModel.findOne({ userId: currentUserId });
-        const userLocation = currentUserProfile?.location;
+        // Use location from query params if provided, otherwise get from profile
+        let locationForDistance = userLocation;
+        if (!locationForDistance) {
+            const currentUserProfile = await this.profileModel.findOne({ userId: currentUserId });
+            locationForDistance = currentUserProfile?.location;
+        }
 
         // Transform to MatchCardResponse format
         return ResponseTransformer.toMatchCardResponse(
             targetProfile,
-            userLocation,
+            locationForDistance,
             photos,
         );
     }
