@@ -12,26 +12,26 @@ import { ChatService } from 'src/Services/chat.service';
   
     @SubscribeMessage('join_room')
     async handleJoinRoom(
-      @MessageBody() data: { roomId: string },
+      @MessageBody() data: { matchId: string },
       @ConnectedSocket() client: Socket,
     ) {
-      client.join(data.roomId);
-      const history = await this.chatService.getMessages(data.roomId);
+      client.join(data.matchId);
+      const history = await this.chatService.getMessages(data.matchId);
       client.emit('chat_history', history);
     }
   
     @SubscribeMessage('send_message')
     async handleSendMessage(
-      @MessageBody() data: { roomId: string; sender: string; message: string },
+      @MessageBody() data: { matchId: string; sender: string; message: string },
       @ConnectedSocket() client: Socket
     ) {
       const msgObj = {
         senderId: data.sender,
         message: data.message,
         timestamp: new Date(),
-        roomId: data.roomId,
+        matchId: data.matchId,
       };
       await this.chatService.sendMessage(msgObj);
-      this.server.to(data.roomId).emit('receive_message', msgObj);
+      this.server.to(data.matchId).emit('receive_message', msgObj);
     }
   }

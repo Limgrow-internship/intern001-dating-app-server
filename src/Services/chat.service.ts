@@ -11,8 +11,8 @@ export class ChatService {
     private readonly messageModel: Model<MessageDocument>,
   ) {}
 
-  async getLastMessageByRoomId(roomId: string) {
-    const lastMsg = await this.messageModel.findOne({ roomId }).sort({ timestamp: -1 }).lean();
+  async getLastMessageBymatchId(matchId: string) {
+    const lastMsg = await this.messageModel.findOne({ matchId }).sort({ timestamp: -1 }).lean();
     if (!lastMsg) return null;
     return {
       ...lastMsg,
@@ -20,10 +20,10 @@ export class ChatService {
     }
   }
 
-  async sendMessage(messageDto: { message: string; roomId: string; senderId: string }) {
+  async sendMessage(messageDto: { message: string; matchId: string; senderId: string }) {
     const encryptedMessage = encryptMessage(messageDto.message);
     const saved = await this.messageModel.create({
-      roomId: messageDto.roomId,
+      matchId: messageDto.matchId,
       senderId: messageDto.senderId,
       message: encryptedMessage,
       timestamp: new Date()
@@ -34,8 +34,8 @@ export class ChatService {
     };
   }
 
-  async getMessages(roomId: string) {
-    const docs = await this.messageModel.find({ roomId }).exec();
+  async getMessages(matchId: string) {
+    const docs = await this.messageModel.find({ matchId }).exec();
     return docs.map(msg => {
       try {
         if (!msg.message) return { ...msg.toObject(), message: '' };

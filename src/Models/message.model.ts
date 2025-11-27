@@ -6,7 +6,7 @@ export type MessageDocument = Message & Document;
 @Schema()
 export class Message {
   @Prop({ required: true })
-  roomId: string;
+  matchId: string;
 
   @Prop({ required: true })
   senderId: string;

@@ -5,19 +5,19 @@ import { ChatService } from 'src/Services/chat.service';
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
-  @Get('history/:roomId')
-  async getHistory(@Param('roomId') roomId: string) {
-    return await this.chatService.getMessages(roomId);
+  @Get('history/:matchId')
+  async getHistory(@Param('matchId') matchId: string) {
+    return await this.chatService.getMessages(matchId);
   }
 
   @Post('send')
-  async sendMessage(@Body() messageDto: { message: string; roomId: string; senderId: string }) {
+  async sendMessage(@Body() messageDto: { message: string; matchId: string; senderId: string }) {
 
     return await this.chatService.sendMessage(messageDto);
   }
 
-  @Get('rooms/:roomId/last-message')
-  async getLastMessage(@Param('roomId') roomId: string) {
-  return this.chatService.getLastMessageByRoomId(roomId);
+  @Get('rooms/:matchId/last-message')
+  async getLastMessage(@Param('matchId') matchId: string) {
+  return this.chatService.getLastMessageBymatchId(matchId);
 }
 }
