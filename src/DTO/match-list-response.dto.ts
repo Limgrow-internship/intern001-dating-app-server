@@ -25,6 +25,20 @@ export class MatchResponseDto {
   @ApiProperty({ description: 'Match status', enum: MatchStatus, example: 'matched' })
   status: MatchStatus;
 
+  @ApiProperty({ 
+    description: 'Distance in kilometers (calculated from GPS coordinates)', 
+    example: 3.5, 
+    nullable: true 
+  })
+  distance: number | null;
+
+  @ApiProperty({ 
+    description: 'Formatted distance text for display', 
+    example: '3.5km', 
+    nullable: true 
+  })
+  distanceText: string | null;
+
   @ApiProperty({ description: 'Created at (ISO 8601)', example: '2025-01-18T10:00:00.000Z' })
   createdAt: string;
 

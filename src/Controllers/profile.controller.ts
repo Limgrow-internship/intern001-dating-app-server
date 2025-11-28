@@ -54,7 +54,12 @@ export class ProfileController {
     @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
     @ApiResponse({ status: 404, description: 'Profile not found' })
     async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
-        return this.profileService.updateProfile(req.user.userId, updateProfileDto);
+        try {
+            const result = await this.profileService.updateProfile(req.user.userId, updateProfileDto);
+            return result;
+        } catch (error) {
+            throw error;
+        }
     }
 
     @Delete()
@@ -113,6 +118,18 @@ export class ProfileController {
         description: 'User ID of the profile to retrieve',
         example: 'user-uuid-here'
     })
+    @ApiQuery({
+        name: 'latitude',
+        required: false,
+        type: Number,
+        description: 'User current latitude from GPS',
+    })
+    @ApiQuery({
+        name: 'longitude',
+        required: false,
+        type: Number,
+        description: 'User current longitude from GPS',
+    })
     @ApiResponse({ 
         status: 200, 
         description: 'Profile retrieved successfully',
@@ -121,7 +138,23 @@ export class ProfileController {
     @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
     @ApiResponse({ status: 404, description: 'Profile not found' })
     @ApiResponse({ status: 400, description: 'Cannot view profile - user is blocked' })
-    async getProfileById(@Param('userId') userId: string, @Request() req): Promise<MatchCardResponseDto> {
-        return this.profileService.getProfileById(userId, req.user.userId);
+    async getProfileById(
+        @Param('userId') userId: string, 
+        @Request() req,
+        @Query('latitude') latitude?: string,
+        @Query('longitude') longitude?: string,
+    ): Promise<MatchCardResponseDto> {
+        // Parse location from query params if provided
+        let userLocation: { coordinates: number[] } | undefined;
+        if (latitude && longitude) {
+            const lat = parseFloat(latitude);
+            const lng = parseFloat(longitude);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                // GeoJSON format: [longitude, latitude]
+                userLocation = { coordinates: [lng, lat] };
+            }
+        }
+
+        return this.profileService.getProfileById(userId, req.user.userId, userLocation);
     }
 }
