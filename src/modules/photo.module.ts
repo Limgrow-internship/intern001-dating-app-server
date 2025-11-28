@@ -6,8 +6,9 @@ import { Photo, PhotoSchema } from '../Models/photo.model';
 import { PhotoService } from '../Services/photo.service';
 import { PhotoController } from '../Controllers/photo.controller';
 import { CloudinaryModule } from './cloudinary.module';
-import { VerifyService } from 'src/Services/verify.service';
-import { VerifyController } from 'src/Controllers/verify.controller';
+// import { VerifyService } from 'src/Services/verify.service';
+// import { VerifyController } from 'src/Controllers/verify.controller';
+// Face verification temporarily disabled - uncomment when TensorFlow.js is properly configured
 import { Profile, ProfileSchema } from 'src/Models/profile.model';
 
 @Module({
@@ -23,8 +24,12 @@ import { Profile, ProfileSchema } from 'src/Models/profile.model';
     }),
     CloudinaryModule,
   ],
-  controllers: [PhotoController, VerifyController],
-  providers: [PhotoService, VerifyService],
-  exports: [PhotoService, VerifyService],
+  controllers: [PhotoController,
+    //  VerifyController
+  ], // VerifyController is temporarily disabled but kept to prevent module errors
+  providers: [PhotoService,
+    // VerifyService
+  ], // VerifyService is temporarily disabled but kept to prevent module errors
+  exports: [PhotoService], // VerifyService removed from exports since it's disabled
 })
-export class PhotoModule {}
+export class PhotoModule { }

@@ -6,6 +6,7 @@ import { Swipe, SwipeDocument } from '../Models/swipe.model';
 import { Preference, PreferenceDocument } from '../Models/preference.model';
 import { BlockedUser, BlockedUserDocument } from '../Models/blocked-user.model';
 import { PhotoService } from './photo.service';
+import { DistanceCalculator } from '../Utils/distance-calculator';
 
 interface ScoredProfile {
   profile: ProfileDocument;
@@ -15,6 +16,7 @@ interface ScoredProfile {
     interestScore: number;
     activityScore: number;
     diversityScore: number;
+    locationScore: number;
   };
 }
 
@@ -134,7 +136,7 @@ export class RecommendationService {
       }),
     );
 
-    // 8. Score each candidate
+    // 8. Score each candidate (preferences already fetched above)
     const scoredCandidates: ScoredProfile[] = candidates.map((candidate) => {
       const candidatePhotos = candidatePhotosMap.get(candidate.userId) || [];
       const breakdown = this.calculateHybridScore(
@@ -142,13 +144,15 @@ export class RecommendationService {
         candidate,
         recentProfiles,
         candidatePhotos,
+        preferences,
       );
 
       const totalScore =
-        breakdown.filterScore * 0.4 +
-        breakdown.interestScore * 0.25 +
-        breakdown.activityScore * 0.15 +
-        breakdown.diversityScore * 0.2;
+        breakdown.filterScore * 0.3 +      // 30% - Basic filters
+        breakdown.interestScore * 0.2 +     // 20% - Interests match
+        breakdown.activityScore * 0.1 +    // 10% - Profile activity
+        breakdown.diversityScore * 0.15 +   // 15% - Diversity
+        breakdown.locationScore * 0.25;    // 25% - Location proximity (NEW)
 
       return {
         profile: candidate,
@@ -176,16 +180,23 @@ export class RecommendationService {
     candidate: ProfileDocument,
     recentProfiles: ProfileDocument[],
     candidatePhotos: any[],
+    preferences: PreferenceDocument,
   ): {
     filterScore: number;
     interestScore: number;
     activityScore: number;
     diversityScore: number;
+    locationScore: number;
   } {
     const filterScore = this.calculateFilterScore(userProfile, candidate, candidatePhotos);
     const interestScore = this.calculateInterestScore(
       userProfile.interests || [],
       candidate.interests || [],
+    );
+    const locationScore = this.calculateLocationScore(
+      userProfile.location || null,
+      candidate.location || null,
+      preferences.maxDistance || 50, // Default 50km
     );
     const activityScore = this.calculateActivityScore(candidate, candidatePhotos);
     const diversityScore = this.calculateDiversityScore(
@@ -193,13 +204,14 @@ export class RecommendationService {
       recentProfiles,
     );
 
-    return {
-      filterScore,
-      interestScore,
-      activityScore,
-      diversityScore,
-    };
-  }
+      return {
+        filterScore,
+        interestScore,
+        activityScore,
+        diversityScore,
+        locationScore,
+      };
+    }
 
   /**
    * Rule-based filter score (0-100)
@@ -271,6 +283,39 @@ export class RecommendationService {
     if (candidatePhotos && candidatePhotos.length > 0) score += 20;
 
     return Math.min(score, 100);
+  }
+
+  /**
+   * Calculate location score based on distance
+   * Closer = higher score (0-100)
+   */
+  private calculateLocationScore(
+    userLocation: { coordinates: number[] } | null,
+    candidateLocation: { coordinates: number[] } | null,
+    maxDistance: number,
+  ): number {
+    // No location data → neutral score (50)
+    if (!userLocation || !candidateLocation) {
+      return 50;
+    }
+
+    // Calculate actual distance
+    const distance = DistanceCalculator.calculateDistanceFromCoords(
+      userLocation.coordinates,
+      candidateLocation.coordinates,
+    );
+
+    // Outside preferred range → low score
+    if (distance > maxDistance) {
+      return 20; // Still some score, but low
+    }
+
+    // Within range: score from 100 (same location) to 60 (at max distance)
+    // Closer = higher score
+    const normalizedDistance = distance / maxDistance; // 0 to 1
+    const score = 100 - (normalizedDistance * 40); // Scale from 100 to 60
+
+    return Math.max(60, Math.min(100, Math.round(score)));
   }
 
   /**

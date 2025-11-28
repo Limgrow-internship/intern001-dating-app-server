@@ -136,6 +136,26 @@ export class PhotoService {
     }
   }
 
+  async deleteAllUserPhotos(userId: string): Promise<void> {
+    // Get all active photos for the user
+    const photos = await this.photoModel.find({ userId, isActive: true });
+
+    // Delete from Cloudinary and mark as inactive
+    const deletePromises = photos.map(async (photo) => {
+      if (photo.cloudinaryPublicId) {
+        try {
+          await this.cloudinaryService.deleteImage(photo.cloudinaryPublicId);
+        } catch (error) {
+          console.error(`Failed to delete photo ${photo._id} from Cloudinary:`, error);
+        }
+      }
+      photo.isActive = false;
+      return photo.save();
+    });
+
+    await Promise.all(deletePromises);
+  }
+
   async reorderPhotos(
     userId: string,
     photoOrders: { photoId: string; order: number }[],

@@ -28,12 +28,26 @@ export class ResponseTransformer {
     userLocation?: { coordinates: number[] },
     photos?: Photo[],
   ): MatchCardResponseDto {
+    // Calculate distance from GPS coordinates (not hardcoded)
     const distance = userLocation && profile.location?.coordinates
       ? DistanceCalculator.calculateDistanceFromCoords(
-          userLocation.coordinates,
-          profile.location.coordinates,
-        )
+        userLocation.coordinates,
+        profile.location.coordinates,
+      )
       : null;
+
+    // Safe logging - check coordinates exist before accessing
+    const userLocStr = userLocation?.coordinates && userLocation.coordinates.length >= 2
+      ? `[${userLocation.coordinates[1]}, ${userLocation.coordinates[0]}]`
+      : 'null';
+    const profileLocStr = profile.location?.coordinates && profile.location.coordinates.length >= 2
+      ? `[${profile.location.coordinates[1]}, ${profile.location.coordinates[0]}]`
+      : 'null';
+    
+    console.log(`[ResponseTransformer] toMatchCardResponse: userId=${profile.userId}, userLocation: ${userLocStr}, profile.location: ${profileLocStr}, calculated distance: ${distance}`);
+
+    // Format distance to display text
+    const distanceText = this.formatDistanceText(distance);
 
     // Transform photos from Photo collection
     const photoDtos = this.transformPhotosFromCollection(photos);
@@ -52,6 +66,7 @@ export class ResponseTransformer {
       photos: photoDtos,
       bio: profile.bio || null,
       distance,
+      distanceText,
       location: this.transformLocation(profile.location, profile.city, profile.country),
       occupation: profile.occupation || null,
       company: profile.company || null,
@@ -111,6 +126,7 @@ export class ResponseTransformer {
     matchedUserProfile: ProfileDocument,
     currentUserId: string,
     photos?: Photo[],
+    currentUserLocation?: { coordinates: number[] },
   ): MatchResponseDto {
     // Map database status to DTO status
     let status: MatchStatus;
@@ -122,12 +138,24 @@ export class ResponseTransformer {
       status = match.status as MatchStatus;
     }
 
+    // Calculate distance from GPS coordinates
+    const distance = currentUserLocation && matchedUserProfile.location?.coordinates
+      ? DistanceCalculator.calculateDistanceFromCoords(
+          currentUserLocation.coordinates,
+          matchedUserProfile.location.coordinates,
+        )
+      : null;
+
+    const distanceText = this.formatDistanceText(distance);
+
     return {
       id: (match._id as any).toString(),
       userId: currentUserId,
       matchedUserId: match.userId === currentUserId ? match.targetUserId : match.userId,
       matchedUser: this.toUserProfileResponse(matchedUserProfile, photos),
       status,
+      distance,
+      distanceText,
       createdAt: (match as any).createdAt?.toISOString() || new Date().toISOString(),
       matchedAt: match.matchedAt?.toISOString() || null,
     };
@@ -185,5 +213,31 @@ export class ResponseTransformer {
       matchId: match ? (match._id as any).toString() : null,
       matchedUser: matchedUserProfile ? this.toUserProfileResponse(matchedUserProfile, photos) : null,
     };
+  }
+
+  /**
+   * Format distance number to display text
+   * - Có distance → Format: "3.5km", "500m", "12km"
+   * - Không có distance → "Gần đây"
+   */
+  private static formatDistanceText(distance: number | null): string | null {
+    // Case 1: Không tính được distance → "Gần đây"
+    if (distance === null || distance === 0) {
+      return 'Gần đây';
+    }
+
+    // Case 2: Dưới 1km → Hiển thị mét
+    if (distance < 1) {
+      const meters = Math.round(distance * 1000);
+      return `${meters}m`; // "500m", "800m"
+    }
+
+    // Case 3: Từ 1km đến dưới 10km → Hiển thị km với 1 số thập phân
+    if (distance < 10) {
+      return `${distance.toFixed(1)}km`; // "3.5km", "9.2km"
+    }
+
+    // Case 4: Từ 10km trở lên → Làm tròn số nguyên
+    return `${Math.round(distance)}km`; // "12km", "50km"
   }
 }

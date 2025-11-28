@@ -16,5 +16,6 @@ import { PhotoModule } from '../modules/photo.module';
   ],
   controllers: [AuthController],
   providers: [AuthService],
+  exports: [JwtModule], 
 })
 export class AuthModule { }
