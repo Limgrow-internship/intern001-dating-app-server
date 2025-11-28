@@ -3,7 +3,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
 type MatchedUserResult = {
-  conversationId: any;
   matchId: any;
   lastActivityAt: any;
   matchedUser: {
@@ -68,7 +67,6 @@ export class ConversationService {
       }
 
       results.push({
-        conversationId: conv._id,
         matchId: conv.matchId,
         lastActivityAt: conv.lastActivityAt,
         matchedUser: {
