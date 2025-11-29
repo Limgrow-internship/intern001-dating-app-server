@@ -32,7 +32,7 @@ export class DistanceCalculator {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = DistanceCalculator.EARTH_RADIUS_KM * c;
 
-    return Math.round(distance * 10) / 10; // Round to 1 decimal place
+    return distance; // Return precise distance without rounding
   }
 
   /**

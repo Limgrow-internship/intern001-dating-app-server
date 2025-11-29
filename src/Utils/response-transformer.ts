@@ -221,15 +221,17 @@ export class ResponseTransformer {
    * - Không có distance → "Gần đây"
    */
   private static formatDistanceText(distance: number | null): string | null {
-    // Case 1: Không tính được distance → "Gần đây"
-    if (distance === null || distance === 0) {
+    // Case 1: Không tính được distance
+    if (distance === null) {
       return 'Gần đây';
     }
 
     // Case 2: Dưới 1km → Hiển thị mét
     if (distance < 1) {
       const meters = Math.round(distance * 1000);
-      return `${meters}m`; // "500m", "800m"
+      // Nếu < 0.5m (làm tròn thành 0) thì hiển thị Gần đây
+      if (meters <= 0) return 'Gần đây';
+      return `${meters}m`; // "500m", "15m"
     }
 
     // Case 3: Từ 1km đến dưới 10km → Hiển thị km với 1 số thập phân
