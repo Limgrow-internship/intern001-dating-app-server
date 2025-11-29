@@ -167,12 +167,8 @@ export class MatchService {
   async getMatchStatus(
     userId: string,
     targetUserId: string,
-  ): Promise<{
-    matched: boolean;
-    userLiked: boolean;
-    targetLiked: boolean;
-  }> {
-    const [userSwipe, targetSwipe, match] = await Promise.all([
+  ) {
+    const [userSwipe, targetSwipe, match, targetProfile] = await Promise.all([
       this.swipeModel.findOne({ userId, targetUserId }),
       this.swipeModel.findOne({ userId: targetUserId, targetUserId: userId }),
       this.matchModel.findOne({
@@ -181,12 +177,49 @@ export class MatchService {
           { userId: targetUserId, targetUserId: userId, status: 'active' },
         ],
       }),
+      this.profileModel.findOne({ userId: targetUserId }).select({
+        firstName: 1,
+        lastName: 1,
+        displayName: 1,
+        gender: 1,
+        bio: 1,
+        interests: 1,
+        city: 1,
+        occupation: 1,
+        height: 1,
+        dateOfBirth: 1,
+      }),
     ]);
+
+    // Tính tuổi (nếu có DOB)
+    let age: number | null = null;
+    if (targetProfile?.dateOfBirth) {
+      const dob = new Date(targetProfile.dateOfBirth);
+      const now = new Date();
+      age = now.getFullYear() - dob.getFullYear();
+      const m = now.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+    }
 
     return {
       matched: !!match,
       userLiked: userSwipe?.action === 'like',
       targetLiked: targetSwipe?.action === 'like',
+
+      targetProfile: targetProfile
+        ? {
+          firstName: targetProfile.firstName,
+          lastName: targetProfile.lastName,
+          displayName: targetProfile.displayName,
+          age,
+          gender: targetProfile.gender,
+          bio: targetProfile.bio,
+          interests: targetProfile.interests ?? [],
+          city: targetProfile.city,
+          occupation: targetProfile.occupation,
+          height: targetProfile.height,
+        }
+        : null,
     };
   }
 

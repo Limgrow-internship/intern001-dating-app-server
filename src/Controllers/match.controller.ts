@@ -39,7 +39,7 @@ export class MatchController {
   constructor(
     private readonly matchService: MatchService,
     private readonly matchActionService: MatchActionService,
-  ) {}
+  ) { }
 
   @Get()
   @ApiOperation({
