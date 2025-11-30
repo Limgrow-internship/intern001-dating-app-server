@@ -11,7 +11,7 @@ export class ChatController {
   }
 
   @Post('send')
-  async sendMessage(@Body() messageDto: { message?: string; matchId: string; senderId: string ;audioPath?: string;
+  async sendMessage(@Body() messageDto: { message?: string; matchId: string; senderId: string ; imgChat:string;audioPath?: string;
     duration?: number;}) {
     return await this.chatService.sendMessage(messageDto);
   }
