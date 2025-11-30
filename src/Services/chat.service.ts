@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { encryptMessage, decryptMessage } from '../common/encryption.util';
 import { Message, MessageDocument } from 'src/Models/message.model';
+import { MessageDTO } from 'src/DTO/message.dto';
 
 @Injectable()
 export class ChatService {
@@ -20,17 +21,21 @@ export class ChatService {
     }
   }
 
-  async sendMessage(messageDto: { message: string; matchId: string; senderId: string }) {
-    const encryptedMessage = encryptMessage(messageDto.message);
+  async sendMessage(messageDto: MessageDTO) {
+    const encryptedMessage = messageDto.message ? encryptMessage(messageDto.message) : '';
     const saved = await this.messageModel.create({
       matchId: messageDto.matchId,
       senderId: messageDto.senderId,
       message: encryptedMessage,
-      timestamp: new Date()
+      audioPath: messageDto.audioPath,
+      duration: messageDto.duration,
+      timestamp: messageDto.timestamp || new Date()
     });
     return {
       ...saved.toObject(),
-      message: messageDto.message
+      message: messageDto.message ?? '',
+      audioPath: messageDto.audioPath,
+      duration: messageDto.duration
     };
   }
 

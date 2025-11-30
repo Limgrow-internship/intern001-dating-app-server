@@ -61,6 +61,20 @@ export class CloudinaryService {
       throw error;
     }
   }
+  async uploadAudioFile(file: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        {
+          folder: 'dating-app/voices',
+          resource_type: 'video',  
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        }
+      ).end(file.buffer);
+    });
+  }
 }
 
 

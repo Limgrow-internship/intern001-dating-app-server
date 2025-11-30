@@ -215,29 +215,21 @@ export class ResponseTransformer {
     };
   }
 
-  /**
-   * Format distance number to display text
-   * - Có distance → Format: "3.5km", "500m", "12km"
-   * - Không có distance → "Gần đây"
-   */
   private static formatDistanceText(distance: number | null): string | null {
-    // Case 1: Không tính được distance → "Gần đây"
-    if (distance === null || distance === 0) {
+    if (distance === null) {
       return 'Gần đây';
     }
 
-    // Case 2: Dưới 1km → Hiển thị mét
     if (distance < 1) {
       const meters = Math.round(distance * 1000);
-      return `${meters}m`; // "500m", "800m"
+      if (meters <= 0) return 'Gần đây';
+      return `${meters}m`;
     }
 
-    // Case 3: Từ 1km đến dưới 10km → Hiển thị km với 1 số thập phân
     if (distance < 10) {
-      return `${distance.toFixed(1)}km`; // "3.5km", "9.2km"
+      return `${distance.toFixed(1)}km`;
     }
 
-    // Case 4: Từ 10km trở lên → Làm tròn số nguyên
-    return `${Math.round(distance)}km`; // "12km", "50km"
+    return `${Math.round(distance)}km`;
   }
 }
