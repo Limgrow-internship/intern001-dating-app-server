@@ -12,6 +12,8 @@ import { Profile, ProfileDocument } from '../Models/profile.model';
 import { Conversation, ConversationDocument } from '../Models/conversation.model';
 import { BlockedUser, BlockedUserDocument } from '../Models/blocked-user.model';
 import { User, UserDocument } from '../Models/user.model';
+import { TargetProfileDto } from 'src/DTO/target-profile.dto';
+import { PhotoService } from './photo.service';
 import {
   AlreadyMatchedException,
   UserBlockedException,
@@ -41,6 +43,7 @@ export class MatchService {
     @InjectModel(Conversation.name) private conversationModel: Model<ConversationDocument>,
     @InjectModel(BlockedUser.name) private blockedUserModel: Model<BlockedUserDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private photoService: PhotoService,
   ) { }
 
   async handleSwipe(
@@ -164,11 +167,8 @@ export class MatchService {
   /**
    * Get match status between two users
    */
-  async getMatchStatus(
-    userId: string,
-    targetUserId: string,
-  ) {
-    const [userSwipe, targetSwipe, match, targetProfile] = await Promise.all([
+  async getMatchStatus(userId: string, targetUserId: string) {
+    const [userSwipe, targetSwipe, match] = await Promise.all([
       this.swipeModel.findOne({ userId, targetUserId }),
       this.swipeModel.findOne({ userId: targetUserId, targetUserId: userId }),
       this.matchModel.findOne({
@@ -177,50 +177,96 @@ export class MatchService {
           { userId: targetUserId, targetUserId: userId, status: 'active' },
         ],
       }),
-      this.profileModel.findOne({ userId: targetUserId }).select({
-        firstName: 1,
-        lastName: 1,
-        displayName: 1,
-        gender: 1,
-        bio: 1,
-        interests: 1,
-        city: 1,
-        occupation: 1,
-        height: 1,
-        dateOfBirth: 1,
-      }),
     ]);
 
-    // Tính tuổi (nếu có DOB)
-    let age: number | null = null;
-    if (targetProfile?.dateOfBirth) {
-      const dob = new Date(targetProfile.dateOfBirth);
-      const now = new Date();
-      age = now.getFullYear() - dob.getFullYear();
-      const m = now.getMonth() - dob.getMonth();
-      if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+    if (match) {
+      return {
+        matched: true,
+        userLiked: userSwipe?.action === 'like',
+        targetLiked: targetSwipe?.action === 'like',
+        targetProfile: null,
+      };
     }
 
-    return {
-      matched: !!match,
-      userLiked: userSwipe?.action === 'like',
-      targetLiked: targetSwipe?.action === 'like',
+    const targetLikedYou = targetSwipe?.action === 'like';
 
-      targetProfile: targetProfile
-        ? {
-          firstName: targetProfile.firstName,
-          lastName: targetProfile.lastName,
-          displayName: targetProfile.displayName,
-          age,
-          gender: targetProfile.gender,
-          bio: targetProfile.bio,
-          interests: targetProfile.interests ?? [],
-          city: targetProfile.city,
-          occupation: targetProfile.occupation,
-          height: targetProfile.height,
-        }
-        : null,
+    let targetProfileData: any = null;
+
+    if (targetLikedYou) {
+      const profile = await this.profileModel.findOne({ userId: targetUserId });
+
+      if (profile) {
+        targetProfileData = {
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          displayName: profile.displayName,
+          age: profile.age,
+          gender: profile.gender,
+          bio: profile.bio,
+          interests: profile.interests ?? [],
+          city: profile.city,
+          occupation: profile.occupation,
+          height: profile.height,
+        };
+      }
+    }
+    return {
+      matched: false,
+      userLiked: userSwipe?.action === 'like',
+      targetLiked: targetLikedYou,
+      targetProfile: targetProfileData,
     };
+  }
+
+  async getUsersWhoLikedYouWithPhotos(userId: string) {
+    const swipes = await this.swipeModel.find({
+      targetUserId: userId,
+      action: 'like',
+    });
+
+    const userIds = swipes.map((s) => s.userId);
+
+    if (userIds.length === 0) return [];
+
+    const profiles = await this.profileModel.find({
+      userId: { $in: userIds },
+    });
+
+    const result = await Promise.all(
+      profiles.map(async (profile) => {
+        const uid = profile.userId;
+
+        const [photos, primaryPhoto] = await Promise.all([
+          this.photoService.getUserPhotos(uid),
+          this.photoService.getPrimaryPhoto(uid),
+        ]);
+
+        return {
+          userId: uid,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          displayName: `${profile.firstName ?? ""} ${profile.lastName ?? ""}`.trim(),
+          age: profile.age,
+          city: profile.city ?? null,
+          avatar: primaryPhoto?.url || null,
+
+          photos: photos.map((p) => ({
+            id: p._id,
+            url: p.url,
+            type: p.type,
+            source: p.source,
+            isPrimary: p.isPrimary,
+            order: p.order,
+            isVerified: p.isVerified,
+            width: p.width,
+            height: p.height,
+            createdAt: p.createdAt,
+          })),
+        };
+      }),
+    );
+
+    return result;
   }
 
   /**
