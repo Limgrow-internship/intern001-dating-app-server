@@ -11,8 +11,14 @@ export class Message {
   @Prop({ required: true })
   senderId: string;
 
-  @Prop({ required: true })
+  @Prop()
   message: string;
+
+  @Prop()
+  audioPath?: string;     
+
+  @Prop()
+  duration?: number;
 
   @Prop({ default: Date.now })
   timestamp: Date;

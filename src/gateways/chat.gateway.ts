@@ -3,6 +3,7 @@ import {
     MessageBody, ConnectedSocket
   } from '@nestjs/websockets';
   import { Server, Socket } from 'socket.io';
+import { MessageDTO } from 'src/DTO/message.dto';
 import { ChatService } from 'src/Services/chat.service';
   
   @WebSocketGateway({ cors: { origin: '*' }, namespace: '/chat' })
@@ -21,17 +22,19 @@ import { ChatService } from 'src/Services/chat.service';
     }
   
     @SubscribeMessage('send_message')
-    async handleSendMessage(
-      @MessageBody() data: { matchId: string; sender: string; message: string },
-      @ConnectedSocket() client: Socket
-    ) {
-      const msgObj = {
-        senderId: data.sender,
-        message: data.message,
-        timestamp: new Date(),
-        matchId: data.matchId,
-      };
-      await this.chatService.sendMessage(msgObj);
-      this.server.to(data.matchId).emit('receive_message', msgObj);
-    }
+async handleSendMessage(
+  @MessageBody() data: { matchId: string; senderId: string; message?: string; audioPath?: string; duration?: number },
+  @ConnectedSocket() client: Socket
+) {
+  const msgObj = {
+    senderId: data.senderId,
+    message: data.message,
+    audioPath: data.audioPath,
+    duration: data.duration,
+    timestamp: new Date(),
+    matchId: data.matchId,
+  };
+  await this.chatService.sendMessage(msgObj);
+  this.server.to(data.matchId).emit('receive_message', msgObj);
+}
   }
