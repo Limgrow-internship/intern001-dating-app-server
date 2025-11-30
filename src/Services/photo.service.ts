@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import type { File as MulterFile } from 'multer';
 import { Photo, PhotoType, PhotoSource } from '../Models/photo.model';
 import { CloudinaryService } from './cloudinary.service';
 
@@ -13,7 +12,7 @@ export class PhotoService {
   ) { }
   async uploadPhoto(
     userId: string,
-    file: MulterFile,
+    file: Express.Multer.File,
     type: PhotoType = PhotoType.GALLERY,
     source: PhotoSource = PhotoSource.UPLOAD,
   ): Promise<Photo> {
