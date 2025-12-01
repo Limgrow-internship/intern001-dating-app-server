@@ -39,7 +39,7 @@ export class MatchController {
   constructor(
     private readonly matchService: MatchService,
     private readonly matchActionService: MatchActionService,
-  ) {}
+  ) { }
 
   @Get()
   @ApiOperation({
@@ -98,6 +98,22 @@ export class MatchController {
     const userId = req.user.userId;
     const status = await this.matchService.getMatchStatus(userId, targetUserId);
     return status;
+  }
+
+  @Get('liked-you')
+  async getUsersWhoLikedYou(@Request() req) {
+    const userId = req.user.userId;
+
+    const users = await this.matchService.getUsersWhoLikedYouWithPhotos(userId);
+
+    return users.map(user => ({
+      userId: user.userId,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      avatar: user.avatar ?? null,
+      age: user.age ?? null,
+      city: user.city ?? null,
+    }));
   }
 
   @Post('actions/like')

@@ -12,6 +12,8 @@ import { Profile, ProfileDocument } from '../Models/profile.model';
 import { Conversation, ConversationDocument } from '../Models/conversation.model';
 import { BlockedUser, BlockedUserDocument } from '../Models/blocked-user.model';
 import { User, UserDocument } from '../Models/user.model';
+import { TargetProfileDto } from 'src/DTO/target-profile.dto';
+import { PhotoService } from './photo.service';
 import {
   AlreadyMatchedException,
   UserBlockedException,
@@ -41,6 +43,7 @@ export class MatchService {
     @InjectModel(Conversation.name) private conversationModel: Model<ConversationDocument>,
     @InjectModel(BlockedUser.name) private blockedUserModel: Model<BlockedUserDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private photoService: PhotoService,
   ) { }
 
   async handleSwipe(
@@ -188,6 +191,57 @@ export class MatchService {
       userLiked: userSwipe?.action === 'like',
       targetLiked: targetSwipe?.action === 'like',
     };
+  }
+
+  async getUsersWhoLikedYouWithPhotos(userId: string) {
+    const swipes = await this.swipeModel.find({
+      targetUserId: userId,
+      action: 'like',
+    });
+
+    const userIds = swipes.map((s) => s.userId);
+
+    if (userIds.length === 0) return [];
+
+    const profiles = await this.profileModel.find({
+      userId: { $in: userIds },
+    });
+
+    const result = await Promise.all(
+      profiles.map(async (profile) => {
+        const uid = profile.userId;
+
+        const [photos, primaryPhoto] = await Promise.all([
+          this.photoService.getUserPhotos(uid),
+          this.photoService.getPrimaryPhoto(uid),
+        ]);
+
+        return {
+          userId: uid,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          displayName: `${profile.firstName ?? ""} ${profile.lastName ?? ""}`.trim(),
+          age: profile.age,
+          city: profile.city ?? null,
+          avatar: primaryPhoto?.url || null,
+
+          photos: photos.map((p) => ({
+            id: p._id,
+            url: p.url,
+            type: p.type,
+            source: p.source,
+            isPrimary: p.isPrimary,
+            order: p.order,
+            isVerified: p.isVerified,
+            width: p.width,
+            height: p.height,
+            createdAt: p.createdAt,
+          })),
+        };
+      }),
+    );
+
+    return result;
   }
 
   /**
