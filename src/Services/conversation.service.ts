@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { Match, MatchDocument } from 'src/Models/match.model';
 
 type MatchedUserResult = {
   matchId: any;
@@ -21,6 +22,8 @@ export class ConversationService {
     @InjectModel('Conversation') private conversationModel: Model<any>,
     @InjectModel('Profile') private profileModel: Model<any>,
     @InjectModel('Photo') private photoModel: Model<any>,
+    @InjectModel('Message') private messageModel: Model<any>,
+    @InjectModel(Match.name) private matchModel: Model<MatchDocument>
   ) {}
 
   private getAge(dateOfBirth: string | Date | null): number | null {
@@ -37,8 +40,17 @@ export class ConversationService {
   }
 
   async listMatchedUsers(currentUserId: string): Promise<MatchedUserResult[]> {
+    const activeMatches = await this.matchModel.find({
+      $or: [
+        { userId: currentUserId },
+        { targetUserId: currentUserId }
+      ],
+      status: 'active'
+    }).select('_id userId targetUserId').lean();
+
+    const activeMatchIds = activeMatches.map(m => m._id);
     const conversations = await this.conversationModel.find({
-      status: 'active',
+      matchId: { $in: activeMatchIds },
       $or: [
         { userId1: currentUserId },
         { userId2: currentUserId }
@@ -70,16 +82,37 @@ export class ConversationService {
         matchId: conv.matchId,
         lastActivityAt: conv.lastActivityAt,
         matchedUser: {
-            userId: profile?.userId || otherUserId,
+          userId: profile?.userId || otherUserId,
           firstName: profile?.firstName || '',
           lastName: profile?.lastName || '',
           url: photo?.url || null,
           age: this.getAge(profile?.dateOfBirth || null),
-        city: profile?.city || '',
+          city: profile?.city || '',
         }
       });
     }
 
     return results;
+  }
+
+  async deleteForUser(matchId: string, userId: string) {
+    const conversation = await this.conversationModel.findOneAndUpdate(
+      { matchId },
+      { $addToSet: { deletedBy: userId } },
+      { new: true }
+    );
+
+    if (
+      conversation &&
+      conversation.deletedBy &&
+      [conversation.userId1, conversation.userId2].every(
+        (u: string) => conversation.deletedBy.includes(u)
+      )
+    ) {
+      await this.messageModel.deleteMany({ matchId });
+      await this.conversationModel.deleteOne({ matchId });
+    }
+
+    return { success: true };
   }
 }

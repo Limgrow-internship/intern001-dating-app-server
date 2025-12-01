@@ -19,6 +19,7 @@ import {
   UserBlockedException,
   MatchNotFoundException,
 } from '../Utils/match.exceptions';
+import { Message, MessageDocument } from 'src/Models/message.model';
 
 export interface MatchWithProfile {
   match: MatchDocument;
@@ -44,6 +45,7 @@ export class MatchService {
     @InjectModel(BlockedUser.name) private blockedUserModel: Model<BlockedUserDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private photoService: PhotoService,
+    @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
   ) { }
 
   async handleSwipe(
@@ -143,24 +145,38 @@ export class MatchService {
     userId: string,
     targetUserId: string,
   ): Promise<{ success: boolean }> {
-    const match = await this.matchModel.findOne({
+    const matches = await this.matchModel.find({
       $or: [
-        { userId, targetUserId, status: 'active' },
-        { userId: targetUserId, targetUserId: userId, status: 'active' },
+        { userId, targetUserId },
+        { userId: targetUserId, targetUserId: userId },
       ],
     });
-
-    if (!match) {
+  
+    if (!matches || matches.length === 0) {
       throw new NotFoundException('Match not found');
     }
-
-    // Update match status
-    match.status = 'unmatched';
-    match.unmatchedAt = new Date();
-    await match.save();
-
-    // TODO: Send notification to the other user about unmatch
-
+    await this.matchModel.deleteMany({
+      $or: [
+        { userId, targetUserId },
+        { userId: targetUserId, targetUserId: userId }
+      ]
+    });
+    await this.conversationModel.deleteMany({
+      $or: [
+        { userId1: userId, userId2: targetUserId },
+        { userId1: targetUserId, userId2: userId }
+      ]
+    });
+    const matchIds = matches.map(m => m._id);
+    await this.messageModel.deleteMany({ matchId: { $in: matchIds } });
+  
+    await this.swipeModel.deleteMany({
+      $or: [
+        { userId, targetUserId },
+        { userId: targetUserId, targetUserId: userId }
+      ]
+    });
+  
     return { success: true };
   }
 
