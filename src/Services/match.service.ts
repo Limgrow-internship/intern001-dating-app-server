@@ -203,8 +203,25 @@ export class MatchService {
 
     if (userIds.length === 0) return [];
 
+    const matchedRecords = await this.matchModel.find({
+      $or: [
+        { userId, targetUserId: { $in: userIds }, status: 'active' },
+        { userId: { $in: userIds }, targetUserId: userId, status: 'active' },
+      ],
+    });
+
+    const matchedUserIds = matchedRecords.map((m) =>
+      m.userId === userId ? m.targetUserId : m.userId
+    );
+
+    const filteredUserIds = userIds.filter(
+      (id) => !matchedUserIds.includes(id),
+    );
+
+    if (filteredUserIds.length === 0) return [];
+
     const profiles = await this.profileModel.find({
-      userId: { $in: userIds },
+      userId: { $in: filteredUserIds },
     });
 
     const result = await Promise.all(
@@ -243,6 +260,7 @@ export class MatchService {
 
     return result;
   }
+
 
   /**
    * Get swipe history for a user
