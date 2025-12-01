@@ -167,7 +167,14 @@ export class MatchService {
   /**
    * Get match status between two users
    */
-  async getMatchStatus(userId: string, targetUserId: string) {
+  async getMatchStatus(
+    userId: string,
+    targetUserId: string,
+  ): Promise<{
+    matched: boolean;
+    userLiked: boolean;
+    targetLiked: boolean;
+  }> {
     const [userSwipe, targetSwipe, match] = await Promise.all([
       this.swipeModel.findOne({ userId, targetUserId }),
       this.swipeModel.findOne({ userId: targetUserId, targetUserId: userId }),
@@ -179,42 +186,10 @@ export class MatchService {
       }),
     ]);
 
-    if (match) {
-      return {
-        matched: true,
-        userLiked: userSwipe?.action === 'like',
-        targetLiked: targetSwipe?.action === 'like',
-        targetProfile: null,
-      };
-    }
-
-    const targetLikedYou = targetSwipe?.action === 'like';
-
-    let targetProfileData: any = null;
-
-    if (targetLikedYou) {
-      const profile = await this.profileModel.findOne({ userId: targetUserId });
-
-      if (profile) {
-        targetProfileData = {
-          firstName: profile.firstName,
-          lastName: profile.lastName,
-          displayName: profile.displayName,
-          age: profile.age,
-          gender: profile.gender,
-          bio: profile.bio,
-          interests: profile.interests ?? [],
-          city: profile.city,
-          occupation: profile.occupation,
-          height: profile.height,
-        };
-      }
-    }
     return {
-      matched: false,
+      matched: !!match,
       userLiked: userSwipe?.action === 'like',
-      targetLiked: targetLikedYou,
-      targetProfile: targetProfileData,
+      targetLiked: targetSwipe?.action === 'like',
     };
   }
 
