@@ -20,6 +20,9 @@ export class Message {
   @Prop()
   duration?: number;
 
+  @Prop()
+  imgChat?: string;
+
   @Prop({ default: Date.now })
   timestamp: Date;
 

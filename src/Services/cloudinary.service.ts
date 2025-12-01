@@ -75,6 +75,25 @@ export class CloudinaryService {
       ).end(file.buffer);
     });
   }
+  async uploadImageFromUrl(imageUrl: string): Promise<string> {
+    if (!imageUrl) throw new Error('No image URL provided');
+    const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+    const buffer = Buffer.from(response.data as ArrayBuffer);
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'dating-app/photos',
+          resource_type: 'image',
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          if (!result?.secure_url) return reject(new Error('No secure_url from cloudinary'));
+          resolve(result.secure_url);
+        }
+      );
+      uploadStream.end(buffer);
+    });
+  }
 }
 
 

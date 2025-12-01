@@ -23,7 +23,7 @@ import { ChatService } from 'src/Services/chat.service';
   
     @SubscribeMessage('send_message')
 async handleSendMessage(
-  @MessageBody() data: { matchId: string; senderId: string; message?: string; audioPath?: string; duration?: number },
+  @MessageBody() data: { matchId: string; senderId: string; message?: string; audioPath?: string; duration?: number; imgChat?: string },
   @ConnectedSocket() client: Socket
 ) {
   const msgObj = {
@@ -31,6 +31,7 @@ async handleSendMessage(
     message: data.message,
     audioPath: data.audioPath,
     duration: data.duration,
+    imgChat: data.imgChat,
     timestamp: new Date(),
     matchId: data.matchId,
   };

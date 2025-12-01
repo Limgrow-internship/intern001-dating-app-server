@@ -27,6 +27,7 @@ export class ChatService {
       matchId: messageDto.matchId,
       senderId: messageDto.senderId,
       message: encryptedMessage,
+      imgChat: messageDto.imgChat,
       audioPath: messageDto.audioPath,
       duration: messageDto.duration,
       timestamp: messageDto.timestamp || new Date()
@@ -34,6 +35,7 @@ export class ChatService {
     return {
       ...saved.toObject(),
       message: messageDto.message ?? '',
+      imgChat: messageDto.imgChat,
       audioPath: messageDto.audioPath,
       duration: messageDto.duration
     };
