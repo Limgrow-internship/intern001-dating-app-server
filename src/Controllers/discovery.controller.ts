@@ -139,12 +139,7 @@ export class DiscoveryController {
       if (!isNaN(lat) && !isNaN(lng)) {
         // GeoJSON format: [longitude, latitude]
         userLocation = { coordinates: [lng, lat] };
-        console.log(`[DiscoveryController] getMatchCards: Received location from query params - lat: ${lat}, lng: ${lng}`);
-      } else {
-        console.log(`[DiscoveryController] getMatchCards: Invalid location params - latitude: ${latitude}, longitude: ${longitude}`);
       }
-    } else {
-      console.log(`[DiscoveryController] getMatchCards: No location in query params - latitude: ${latitude}, longitude: ${longitude}`);
     }
 
     return this.discoveryService.getMatchCards(userId, requestedLimit, userLocation);

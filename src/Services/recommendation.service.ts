@@ -101,17 +101,12 @@ export class RecommendationService {
     }
 
     // 5. Fetch candidate profiles
-    console.log('🔍 Recommendation Filter Query:', JSON.stringify(filterQuery, null, 2));
-
     const candidates = await this.profileModel
       .find(filterQuery)
       .limit(100) // Limit candidate pool for performance
       .exec();
 
-    console.log(`✅ Found ${candidates.length} candidates for user ${userId}`);
-
     if (candidates.length === 0) {
-      console.log(`⚠️ No candidates found. Swipe count: ${swipedUserIds.length}, Blocked count: ${blockedUserIds.length}`);
       return [];
     }
 
