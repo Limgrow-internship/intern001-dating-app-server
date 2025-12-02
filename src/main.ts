@@ -47,10 +47,8 @@ async function bootstrap() {
       },
     });
 
-    console.log('Swagger is running at: http://localhost:3000/api-docs');
   }
 
   await app.listen(process.env.PORT || 3000, '0.0.0.0');
-  console.log(`App running on http://localhost:${process.env.PORT || 3000}`);
 }
 bootstrap();

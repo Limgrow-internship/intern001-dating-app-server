@@ -28,7 +28,6 @@ import { JwtAuthGuard } from 'src/Guards/jwt-auth.guard';
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('selfie'))
   async verifyFace(@UploadedFile() file: any, @Req() req) {
-    console.log("req.user", req.user);
     const userId = req.user.userId;
     return await this.verifyService.verifyFace(userId, file.buffer);
   }

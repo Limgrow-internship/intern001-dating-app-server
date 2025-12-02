@@ -36,15 +36,6 @@ export class ResponseTransformer {
       )
       : null;
 
-    // Safe logging - check coordinates exist before accessing
-    const userLocStr = userLocation?.coordinates && userLocation.coordinates.length >= 2
-      ? `[${userLocation.coordinates[1]}, ${userLocation.coordinates[0]}]`
-      : 'null';
-    const profileLocStr = profile.location?.coordinates && profile.location.coordinates.length >= 2
-      ? `[${profile.location.coordinates[1]}, ${profile.location.coordinates[0]}]`
-      : 'null';
-    
-    console.log(`[ResponseTransformer] toMatchCardResponse: userId=${profile.userId}, userLocation: ${userLocStr}, profile.location: ${profileLocStr}, calculated distance: ${distance}`);
 
     // Format distance to display text
     const distanceText = this.formatDistanceText(distance);

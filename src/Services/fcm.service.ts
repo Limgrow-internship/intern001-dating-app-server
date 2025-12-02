@@ -23,7 +23,6 @@ export class FcmService implements OnModuleInit {
       // Check if already initialized
       if (admin.apps.length > 0) {
         this.initialized = true;
-        this.logger.log('Firebase Admin SDK already initialized');
         return;
       }
 
@@ -34,7 +33,6 @@ export class FcmService implements OnModuleInit {
           credential: admin.credential.cert(serviceAccount),
         });
         this.initialized = true;
-        this.logger.log('Firebase Admin SDK initialized with service account JSON');
         return;
       }
 
@@ -45,7 +43,6 @@ export class FcmService implements OnModuleInit {
           credential: admin.credential.cert(serviceAccount),
         });
         this.initialized = true;
-        this.logger.log('Firebase Admin SDK initialized with service account file');
         return;
       }
 
@@ -53,7 +50,6 @@ export class FcmService implements OnModuleInit {
       try {
         admin.initializeApp();
         this.initialized = true;
-        this.logger.log('Firebase Admin SDK initialized with default credentials');
       } catch (error) {
         this.logger.warn('Firebase Admin SDK initialization skipped - no credentials found');
         this.logger.warn('Set FIREBASE_SERVICE_ACCOUNT or FIREBASE_SERVICE_ACCOUNT_PATH environment variable');
@@ -189,8 +185,7 @@ export class FcmService implements OnModuleInit {
         // Web push: App sẽ xử lý navigation từ data payload, không dùng link trong fcmOptions
       };
 
-      const response = await admin.messaging().send(message);
-      this.logger.log(`Like notification sent successfully: ${response}`);
+      await admin.messaging().send(message);
     } catch (error: any) {
       // Handle invalid/expired tokens gracefully
       if (
@@ -313,8 +308,7 @@ export class FcmService implements OnModuleInit {
         // Web push: App sẽ xử lý navigation từ data payload, không dùng link trong fcmOptions
       };
 
-      const response = await admin.messaging().send(message);
-      this.logger.log(`Match notification sent to ${targetUserId}: ${response}`);
+      await admin.messaging().send(message);
     } catch (error: any) {
       if (
         error.code === 'messaging/invalid-registration-token' ||

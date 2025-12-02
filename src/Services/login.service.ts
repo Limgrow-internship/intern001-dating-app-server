@@ -102,10 +102,8 @@ export class AuthService {
         audience: process.env.GOOGLE_CLIENT_ID,
       });
       payload = ticket.getPayload();
-      console.log("[GoogleLogin] payload:", payload);
       if (!payload) throw new UnauthorizedException('Invalid Google token');
     } catch (err) {
-      console.error("[GoogleLogin] verifyIdToken error:", err);
       throw new UnauthorizedException('Invalid Google token');
     }
 
@@ -170,9 +168,8 @@ export class AuthService {
           PhotoType.AVATAR,
         );
         photoUrl = photo.url;
-        console.log("[GoogleLogin] Uploaded avatar to Photos:", photoUrl);
       } catch (err) {
-        console.error("[GoogleLogin] Photo upload error:", err);
+        // Photo upload failed, continue without photo
       }
     }
 
@@ -288,7 +285,7 @@ export class AuthService {
           PhotoType.AVATAR,
         );
       } catch (err) {
-        console.error("[FacebookLogin] Photo upload error:", err);
+        // Photo upload failed, continue without photo
       }
     }
 

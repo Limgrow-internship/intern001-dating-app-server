@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -29,6 +30,7 @@ import { User, UserDocument } from '../Models/user.model';
 
 @Injectable()
 export class DiscoveryService {
+  private readonly logger = new Logger(DiscoveryService.name);
   constructor(
     @InjectModel(Match.name) private matchModel: Model<MatchDocument>,
     @InjectModel(Swipe.name) private swipeModel: Model<SwipeDocument>,
@@ -120,11 +122,6 @@ export class DiscoveryService {
     // Use location from query params if provided, otherwise fallback to profile location
     const locationForDistance = userLocation || userProfile.location;
     
-    // Safe logging - check coordinates exist before accessing
-    const locStr = locationForDistance?.coordinates && locationForDistance.coordinates.length >= 2
-      ? `[${locationForDistance.coordinates[1]}, ${locationForDistance.coordinates[0]}]`
-      : 'null';
-    console.log(`[DiscoveryService] getMatchCards: userId=${userId}, locationForDistance: ${locStr} (from ${userLocation ? 'query params' : 'profile'})`);
 
     const blockedUserIds = await this.getBlockedUserIds(userId);
     const swipedUserIds = await this.swipeModel
@@ -146,11 +143,9 @@ export class DiscoveryService {
       )
       .slice(0, limit);
 
-    // Log statistics about candidate locations
     const candidatesWithLocation = filteredRecs.filter(rec => 
       rec.profile.location?.coordinates && rec.profile.location.coordinates.length >= 2
     ).length;
-    console.log(`[DiscoveryService] getMatchCards: Total candidates: ${filteredRecs.length}, Candidates with location: ${candidatesWithLocation}, Candidates without location: ${filteredRecs.length - candidatesWithLocation}`);
 
     // Fetch photos for all candidates in parallel
     const cardsWithPhotos = await Promise.all(
@@ -161,11 +156,6 @@ export class DiscoveryService {
           locationForDistance,
           photos,
         );
-        // Safe logging - check coordinates exist before accessing
-        const candidateLocStr = rec.profile.location?.coordinates && rec.profile.location.coordinates.length >= 2
-          ? `[${rec.profile.location.coordinates[1]}, ${rec.profile.location.coordinates[0]}]`
-          : 'null';
-        console.log(`[DiscoveryService] getMatchCards: Card for userId=${rec.profile.userId}, distance=${card.distance}, distanceText=${card.distanceText}, candidateLocation: ${candidateLocStr}`);
         return card;
       }),
     );
@@ -299,12 +289,14 @@ export class DiscoveryService {
       // Get target user's FCM token
       const targetUser = await this.userModel.findOne({ id: targetUserId }).select('fcmToken');
       if (!targetUser?.fcmToken) {
+        this.logger.warn(`Like notification skipped: user ${targetUserId} has no FCM token`);
         return; // No FCM token, skip notification
       }
 
       // Get liker's profile info
       const likerProfile = await this.profileModel.findOne({ userId: likerId });
       if (!likerProfile) {
+        this.logger.warn(`Like notification skipped: liker profile not found for ${likerId}`);
         return;
       }
 
@@ -318,7 +310,6 @@ export class DiscoveryService {
                        `${likerProfile.firstName || ''} ${likerProfile.lastName || ''}`.trim() || 
                        'Someone';
 
-      // Send notification
       await this.fcmService.sendLikeNotification(
         targetUserId,
         targetUser.fcmToken,
@@ -327,7 +318,7 @@ export class DiscoveryService {
         likerPhotoUrl,
       );
     } catch (error) {
-      console.error('Error sending like notification:', error);
+      this.logger.error('Error sending like notification:', error);
       // Don't throw - we don't want to fail the like operation
     }
   }
@@ -354,6 +345,7 @@ export class DiscoveryService {
       ]);
 
       if (!profile1 || !profile2) {
+        this.logger.warn(`Match notification skipped: missing profile (user1=${!!profile1}, user2=${!!profile2})`);
         return;
       }
 
@@ -377,6 +369,18 @@ export class DiscoveryService {
                    'Someone';
 
       // Send notifications to both users
+      if (!user1?.fcmToken && !user2?.fcmToken) {
+        this.logger.warn(`Match notification skipped: both users ${userId1}, ${userId2} lack FCM tokens`);
+        return;
+      } else {
+        if (!user1?.fcmToken) {
+          this.logger.warn(`Match notification: user ${userId1} missing FCM token`);
+        }
+        if (!user2?.fcmToken) {
+          this.logger.warn(`Match notification: user ${userId2} missing FCM token`);
+        }
+      }
+
       const matchId = (match as any)._id?.toString() || (match as any).id;
       await this.fcmService.sendMatchNotification(
         userId1,
@@ -390,7 +394,7 @@ export class DiscoveryService {
         photoUrl2,
       );
     } catch (error) {
-      console.error('Error sending match notification:', error);
+      this.logger.error(`Error sending match notification between ${userId1} and ${userId2}:`, error);
       // Don't throw - we don't want to fail the match operation
     }
   }
