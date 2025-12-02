@@ -106,14 +106,21 @@ export class MatchController {
 
     const users = await this.matchService.getUsersWhoLikedYouWithPhotos(userId);
 
-    return users.map(user => ({
-      userId: user.userId,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      avatar: user.avatar ?? null,
-      age: user.age ?? null,
-      city: user.city ?? null,
-    }));
+    return users.map(user => {
+      const primaryPhoto = user.photos?.find(p => p.isPrimary) || null;
+
+      const fallbackPhoto = user.photos?.length ? user.photos[0] : null;
+
+      return {
+        userId: user.userId,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        age: user.age ?? null,
+        city: user.city ?? null,
+        avatar: user.avatar ?? null,
+        picture: primaryPhoto?.url || fallbackPhoto?.url || null,
+      };
+    });
   }
 
   @Post('actions/like')
