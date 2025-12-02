@@ -378,10 +378,6 @@ export class MatchService {
       // Commit transaction
       await session.commitTransaction();
 
-      this.logger.log(
-        `Match created successfully: ${userAId} - ${userBId}, Match ID: ${match._id}`,
-      );
-
       // TODO: Send notifications to both users (async, non-blocking)
       // TODO: Emit WebSocket event for realtime update
 
@@ -443,7 +439,6 @@ export class MatchService {
       { status: 'blocked' },
     );
 
-    this.logger.log(`User ${blockerUserId} blocked ${blockedUserId}`);
     return { success: true };
   }
 }

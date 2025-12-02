@@ -54,13 +54,6 @@ export class AIRouterService {
         timeout: 30000,
       },
     ].sort((a, b) => a.priority - b.priority);
-
-    this.logger.log(
-      `AI Router initialized with providers: ${this.providers
-        .filter((p) => p.enabled)
-        .map((p) => p.name)
-        .join(', ')}`,
-    );
   }
 
   /**
@@ -72,15 +65,9 @@ export class AIRouterService {
 
     // Try each provider in priority order
     for (const provider of this.providers.filter((p) => p.enabled)) {
-      this.logger.log(`Trying provider: ${provider.name}`);
-
       try {
         const response = await this.callProvider(provider, request);
         const latency = Date.now() - startTime;
-
-        this.logger.log(
-          `✅ Success with ${provider.name} (${latency}ms)`,
-        );
 
         return {
           ...response,

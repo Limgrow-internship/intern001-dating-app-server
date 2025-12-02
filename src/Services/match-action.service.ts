@@ -192,7 +192,6 @@ export class MatchActionService {
     userId: string,
     targetUserId: string,
   ): Promise<LikeResponseDto> {
-    this.logger.log(`User ${userId} attempting to like ${targetUserId}`);
 
     // Validate
     await this.validateAction(userId, targetUserId);
@@ -233,10 +232,6 @@ export class MatchActionService {
       );
 
       if (matchResult.success) {
-        this.logger.log(
-          `Match created: ${userId} - ${targetUserId}, Match ID: ${matchResult.match?._id}`,
-        );
-
         // Get updated quota
         const updatedQuota = await this.checkQuota(userId, 'likes');
 
@@ -273,7 +268,6 @@ export class MatchActionService {
     userId: string,
     targetUserId: string,
   ): Promise<SuperLikeResponseDto> {
-    this.logger.log(`User ${userId} attempting to SuperLike ${targetUserId}`);
 
     // Validate
     await this.validateAction(userId, targetUserId);
@@ -319,10 +313,6 @@ export class MatchActionService {
       );
 
       if (matchResult.success) {
-        this.logger.log(
-          `Match created via SuperLike: ${userId} - ${targetUserId}`,
-        );
-
         const updatedQuota = await this.checkQuota(userId, 'superLikes');
 
         return {
@@ -358,7 +348,6 @@ export class MatchActionService {
     userId: string,
     targetUserId: string,
   ): Promise<DislikeResponseDto> {
-    this.logger.log(`User ${userId} disliking ${targetUserId}`);
 
     // Check self-dislike
     if (userId === targetUserId) {

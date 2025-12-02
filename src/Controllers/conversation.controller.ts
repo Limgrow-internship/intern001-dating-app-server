@@ -9,8 +9,6 @@ export class ConversationController {
 
   @Get('matched-users')
   async listMatchedUsers(@Req() req) {
-    console.log('req.user:', req.user);
-  console.log('req.query:', req.query);
     const currentUserId = req.user?.userId || req.query.userId;
     return this.conversationService.listMatchedUsers(currentUserId);
   }
