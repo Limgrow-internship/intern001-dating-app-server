@@ -45,39 +45,42 @@ export class ConversationService {
         { userId: currentUserId },
         { targetUserId: currentUserId }
       ],
-      status: 'active'
-    }).select('_id userId targetUserId').lean();
-
-    const activeMatchIds = activeMatches.map(m => m._id);
+      status: { $in: ['active', 'unmatched'] }
+    }).select('_id userId targetUserId status').lean();
+  
+    const matchIdToStatus = new Map();
+    activeMatches.forEach(m => matchIdToStatus.set(m._id.toString(), m.status));
+  
+    const matchIds = activeMatches.map(m => m._id);
     const conversations = await this.conversationModel.find({
-      matchId: { $in: activeMatchIds },
+      matchId: { $in: matchIds },
       $or: [
         { userId1: currentUserId },
         { userId2: currentUserId }
       ]
     }).lean();
-
+  
     const matchedUserIds = conversations.map(conv =>
       conv.userId1 === currentUserId ? conv.userId2 : conv.userId1
     );
-
+  
     const profiles = await this.profileModel.find({ userId: { $in: matchedUserIds } }).lean();
     const primaryPhotos = await this.photoModel.find({
       userId: { $in: matchedUserIds },
       isPrimary: true,
       isActive: true
     }).lean();
-
+  
     const results: MatchedUserResult[] = [];
     for (const conv of conversations) {
       const otherUserId = conv.userId1 === currentUserId ? conv.userId2 : conv.userId1;
       const profile = profiles.find(p => p.userId === otherUserId);
-
+  
       let photo = primaryPhotos.find(ph => ph.userId === otherUserId);
       if (!photo) {
         photo = await this.photoModel.findOne({ userId: otherUserId, isActive: true }).sort({ createdAt: 1 }).lean() as any;
       }
-
+  
       results.push({
         matchId: conv.matchId,
         lastActivityAt: conv.lastActivityAt,
@@ -88,10 +91,11 @@ export class ConversationService {
           url: photo?.url || null,
           age: this.getAge(profile?.dateOfBirth || null),
           city: profile?.city || '',
-        }
-      });
+        },
+        status: matchIdToStatus.get(conv.matchId?.toString()) || 'active'
+      } as any);
     }
-
+  
     return results;
   }
 
