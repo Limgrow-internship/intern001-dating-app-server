@@ -51,12 +51,12 @@ export class ProfileService {
 
     async getProfile(userId: string) {
         const profile = await this.profileModel.findOne({ userId });
+        if (!profile) throw new NotFoundException('Profile not found');
 
-        if (!profile) {
-            throw new NotFoundException('Profile not found');
-        }
-
-        return profile;
+        return {
+            ...profile.toObject(),
+            openQuestionAnswers: profile.openQuestionAnswers ?? {}
+        };
     }
 
     async getProfileWithPhotos(userId: string) {
@@ -115,7 +115,7 @@ export class ProfileService {
                     if (Array.isArray(coordinates) && coordinates.length >= 2) {
                         const longitude = typeof coordinates[0] === 'number' ? coordinates[0] : parseFloat(coordinates[0] as any);
                         const latitude = typeof coordinates[1] === 'number' ? coordinates[1] : parseFloat(coordinates[1] as any);
-                        
+
                         if (!isNaN(longitude) && !isNaN(latitude)) {
                             updateData.location = {
                                 type: 'Point',
@@ -132,7 +132,7 @@ export class ProfileService {
                 else if (typeof loc === 'object' && 'longitude' in loc && 'latitude' in loc) {
                     const longitude = typeof loc.longitude === 'number' ? loc.longitude : parseFloat(loc.longitude as any);
                     const latitude = typeof loc.latitude === 'number' ? loc.latitude : parseFloat(loc.latitude as any);
-                    
+
                     if (!isNaN(longitude) && !isNaN(latitude)) {
                         updateData.location = {
                             type: 'Point',
@@ -146,62 +146,62 @@ export class ProfileService {
                 }
             }
 
-        // Handle profilePicture
-        if (updateProfileDto.profilePicture) {
-            try {
-                await this.photoService.uploadFromUrl(
-                    userId,
-                    updateProfileDto.profilePicture,
-                    PhotoSource.UPLOAD,
-                    PhotoType.AVATAR,
-                );
-                const photos = await this.photoService.getUserPhotos(userId);
-                if (photos.length > 0) {
-                    const latestPhoto = photos[photos.length - 1];
-                    await this.photoService.setPrimaryPhoto(userId, (latestPhoto._id as any).toString());
+            // Handle profilePicture
+            if (updateProfileDto.profilePicture) {
+                try {
+                    await this.photoService.uploadFromUrl(
+                        userId,
+                        updateProfileDto.profilePicture,
+                        PhotoSource.UPLOAD,
+                        PhotoType.AVATAR,
+                    );
+                    const photos = await this.photoService.getUserPhotos(userId);
+                    if (photos.length > 0) {
+                        const latestPhoto = photos[photos.length - 1];
+                        await this.photoService.setPrimaryPhoto(userId, (latestPhoto._id as any).toString());
+                    }
+                } catch (error) {
+                    // Ignore photo upload errors during profile update
                 }
-            } catch (error) {
-                // Ignore photo upload errors during profile update
+                delete updateData.profilePicture;
             }
-            delete updateData.profilePicture;
-        }
 
-        // Map zodiac
-        if (updateProfileDto.zodiacSign) updateData.zodiacSign = updateProfileDto.zodiacSign;
+            // Map zodiac
+            if (updateProfileDto.zodiacSign) updateData.zodiacSign = updateProfileDto.zodiacSign;
 
-        // Map relationshipMode aliases
-        if (updateProfileDto.relationshipMode) {
-            const rm = updateProfileDto.relationshipMode;
-            if (rm === 'Serious Mode') updateData.relationshipMode = 'serious';
-            else if (rm === 'Casual Mode') updateData.relationshipMode = 'casual';
-            else if (rm === 'Friendship Mode') updateData.relationshipMode = 'friendship';
-        }
-        if (updateData.openQuestionAnswers) {
-            profile.openQuestionAnswers = updateData.openQuestionAnswers as Record<string, string>;
-            delete updateData.openQuestionAnswers;
-        }
+            // Map relationshipMode aliases
+            if (updateProfileDto.relationshipMode) {
+                const rm = updateProfileDto.relationshipMode;
+                if (rm === 'Serious Mode') updateData.relationshipMode = 'serious';
+                else if (rm === 'Casual Mode') updateData.relationshipMode = 'casual';
+                else if (rm === 'Friendship Mode') updateData.relationshipMode = 'friendship';
+            }
+            if (updateData.openQuestionAnswers) {
+                profile.openQuestionAnswers = updateData.openQuestionAnswers as Record<string, string>;
+                delete updateData.openQuestionAnswers;
+            }
 
             // Update database
             // Handle location separately using direct MongoDB update to ensure proper GeoJSON format
             const locationToSet = updateData.location;
             if (locationToSet) {
                 // Validate location format
-                if (locationToSet.type === 'Point' && 
+                if (locationToSet.type === 'Point' &&
                     locationToSet.coordinates &&
                     Array.isArray(locationToSet.coordinates) &&
                     locationToSet.coordinates.length >= 2 &&
                     locationToSet.coordinates.every((coord: any) => coord !== null && coord !== undefined && !isNaN(coord))) {
-                    
+
                     // Prepare valid location
                     const validLocation = {
                         type: 'Point',
                         coordinates: [locationToSet.coordinates[0], locationToSet.coordinates[1]]
                     };
-                    
+
                     // Always use $set with raw MongoDB collection to bypass validation
                     // $set will overwrite any existing location (valid or invalid)
                     const collection = this.profileModel.collection;
-                await collection.updateOne(
+                    await collection.updateOne(
                         { userId },
                         { $set: { location: validLocation } }
                     );
@@ -216,24 +216,24 @@ export class ProfileService {
                     delete updateData.location;
                 }
             }
-            
+
             // Remove null values to avoid overwriting existing data with null
             Object.keys(updateData).forEach(key => {
                 if (updateData[key] !== null && updateData[key] !== undefined) {
                     profile[key] = updateData[key];
                 }
             });
-            
+
             // Save other fields (location already saved above)
             await profile.save();
-            
+
             // Reload profile to get the latest data including location
             // Need to reload because location was set via raw MongoDB collection
             const updatedProfile = await this.profileModel.findOne({ userId });
             if (!updatedProfile) {
                 throw new NotFoundException('Profile not found after update');
             }
-            
+
             return updatedProfile;
         } catch (error) {
             throw error;
@@ -253,10 +253,10 @@ export class ProfileService {
         const deleteOperations = [
             // Delete profile
             this.profileModel.deleteOne({ userId }),
-            
+
             // Delete all photos
             this.photoService.deleteAllUserPhotos(userId).catch(() => undefined),
-            
+
             // Delete all swipes where user is the swiper or target
             this.swipeModel.deleteMany({
                 $or: [
@@ -264,7 +264,7 @@ export class ProfileService {
                     { targetUserId: userId }
                 ]
             }),
-            
+
             // Delete all matches where user is involved
             this.matchModel.deleteMany({
                 $or: [
@@ -272,7 +272,7 @@ export class ProfileService {
                     { targetUserId: userId }
                 ]
             }),
-            
+
             // Delete all conversations where user is involved
             this.conversationModel.deleteMany({
                 $or: [
@@ -280,7 +280,7 @@ export class ProfileService {
                     { userId2: userId }
                 ]
             }),
-            
+
             // Delete all blocked user records where user is blocker or blocked
             this.blockedUserModel.deleteMany({
                 $or: [
@@ -288,10 +288,10 @@ export class ProfileService {
                     { blockedUserId: userId }
                 ]
             }),
-            
+
             // Delete all daily limits
             this.dailyLimitModel.deleteMany({ userId }),
-            
+
             // Delete preferences
             this.preferenceModel.deleteMany({ userId }),
         ];
@@ -299,7 +299,7 @@ export class ProfileService {
         // Execute all delete operations
         await Promise.allSettled(deleteOperations);
 
-        return { 
+        return {
             message: 'Profile and all related data deleted successfully',
             deleted: {
                 profile: true,
@@ -333,7 +333,7 @@ export class ProfileService {
      * Returns profile in MatchCardResponse format
      */
     async getProfileById(
-        targetUserId: string, 
+        targetUserId: string,
         currentUserId: string,
         userLocation?: { coordinates: number[] },
     ): Promise<MatchCardResponseDto> {
