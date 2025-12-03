@@ -1,9 +1,14 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Inject, forwardRef } from '@nestjs/common';
+import { ChatGateway } from 'src/gateways/chat.gateway';
 import { ChatService } from 'src/Services/chat.service';
 
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    @Inject(forwardRef(() => ChatGateway))
+    private readonly chatGateway: ChatGateway,
+  ) {}
 
   @Get('history/:matchId')
   async getHistory(@Param('matchId') matchId: string) {
@@ -11,13 +16,28 @@ export class ChatController {
   }
 
   @Post('send')
-  async sendMessage(@Body() messageDto: { message?: string; matchId: string; senderId: string ; imgChat:string;audioPath?: string;
-    duration?: number;}) {
-    return await this.chatService.sendMessage(messageDto);
+  async sendMessage(
+    @Body()
+    messageDto: {
+      message?: string;
+      matchId: string;
+      senderId: string;
+      imgChat: string;
+      audioPath?: string;
+      duration?: number;
+    },
+  ) {
+    const msg = await this.chatService.sendMessage(messageDto);
+    this.chatGateway.emitMessageToRoom(messageDto.matchId, {
+      ...msg,
+      matchId: messageDto.matchId,
+      senderId: messageDto.senderId,
+    });
+    return msg;
   }
 
   @Get('rooms/:matchId/last-message')
   async getLastMessage(@Param('matchId') matchId: string) {
-  return this.chatService.getLastMessageBymatchId(matchId);
-}
+    return this.chatService.getLastMessageBymatchId(matchId);
+  }
 }
