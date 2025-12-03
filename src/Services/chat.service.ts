@@ -13,16 +13,21 @@ export class ChatService {
   ) {}
 
   async getLastMessageBymatchId(matchId: string) {
-    const lastMsg = await this.messageModel.findOne({ matchId }).sort({ timestamp: -1 }).lean();
+    const lastMsg = await this.messageModel
+      .findOne({ matchId })
+      .sort({ timestamp: -1 })
+      .lean();
     if (!lastMsg) return null;
     return {
       ...lastMsg,
-      message: decryptMessage(lastMsg.message) 
-    }
+      message: decryptMessage(lastMsg.message),
+    };
   }
 
   async sendMessage(messageDto: MessageDTO) {
-    const encryptedMessage = messageDto.message ? encryptMessage(messageDto.message) : '';
+    const encryptedMessage = messageDto.message
+      ? encryptMessage(messageDto.message)
+      : '';
     const saved = await this.messageModel.create({
       matchId: messageDto.matchId,
       senderId: messageDto.senderId,
@@ -30,34 +35,33 @@ export class ChatService {
       imgChat: messageDto.imgChat,
       audioPath: messageDto.audioPath,
       duration: messageDto.duration,
-      timestamp: messageDto.timestamp || new Date()
+      timestamp: messageDto.timestamp || new Date(),
     });
     return {
       ...saved.toObject(),
       message: messageDto.message ?? '',
       imgChat: messageDto.imgChat,
       audioPath: messageDto.audioPath,
-      duration: messageDto.duration
+      duration: messageDto.duration,
     };
   }
 
   async getMessages(matchId: string) {
     const docs = await this.messageModel.find({ matchId }).exec();
-    return docs.map(msg => {
+    return docs.map((msg) => {
       try {
         if (!msg.message) return { ...msg.toObject(), message: '' };
         const decrypted = decryptMessage(msg.message);
         return {
           ...msg.toObject(),
-          message: decrypted || msg.message
-        }
+          message: decrypted || msg.message,
+        };
       } catch (e) {
         console.error('Decrypt fail message:', msg.message, e);
-        
         return {
           ...msg.toObject(),
-          message: '[Decrypt error]' 
-        }
+          message: '[Decrypt error]',
+        };
       }
     });
   }
