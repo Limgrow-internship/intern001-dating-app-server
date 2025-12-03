@@ -7,6 +7,8 @@ import { User, UserSchema } from '../Models/user.model';
 import { AuthModule } from './auth.modules';
 import { ProfileSchema } from 'src/Models/profile.model';
 import { PhotoSchema } from 'src/Models/photo.model';
+import { MessageSchema } from 'src/Models/message.model';
+import { Match, MatchSchema } from 'src/Models/match.model';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { PhotoSchema } from 'src/Models/photo.model';
       { name: 'Profile', schema: ProfileSchema }, 
       { name: 'Photo', schema: PhotoSchema },
       { name: User.name, schema: UserSchema },
+      { name: 'Message', schema: MessageSchema},
+      { name: Match.name, schema: MatchSchema },  
     ]),
   ],
   controllers: [ConversationController],

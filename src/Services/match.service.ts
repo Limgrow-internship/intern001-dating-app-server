@@ -19,6 +19,7 @@ import {
   UserBlockedException,
   MatchNotFoundException,
 } from '../Utils/match.exceptions';
+import { Message, MessageDocument } from 'src/Models/message.model';
 
 export interface MatchWithProfile {
   match: MatchDocument;
@@ -44,6 +45,7 @@ export class MatchService {
     @InjectModel(BlockedUser.name) private blockedUserModel: Model<BlockedUserDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private photoService: PhotoService,
+    @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
   ) { }
 
   async handleSwipe(
@@ -136,32 +138,25 @@ export class MatchService {
     return matchesWithProfiles;
   }
 
-  /**
-   * Unmatch with a user
-   */
-  async unmatch(
-    userId: string,
-    targetUserId: string,
-  ): Promise<{ success: boolean }> {
+  async unmatch(userId: string, targetUserId: string) {
+    await this.matchModel.updateMany(
+      {
+        $or: [
+          { userId, targetUserId },
+          { userId: targetUserId, targetUserId: userId }
+        ],
+        status: 'active',
+      },
+      { $set: { status: 'unmatched', unmatchedAt: new Date() } }
+    );
+  
     const match = await this.matchModel.findOne({
       $or: [
-        { userId, targetUserId, status: 'active' },
-        { userId: targetUserId, targetUserId: userId, status: 'active' },
-      ],
-    });
-
-    if (!match) {
-      throw new NotFoundException('Match not found');
-    }
-
-    // Update match status
-    match.status = 'unmatched';
-    match.unmatchedAt = new Date();
-    await match.save();
-
-    // TODO: Send notification to the other user about unmatch
-
-    return { success: true };
+        { userId, targetUserId },
+        { userId: targetUserId, targetUserId: userId }
+      ]
+    }).sort({ updatedAt: -1 });
+    return { status: match?.status ?? 'none' };
   }
 
   /**
@@ -171,23 +166,52 @@ export class MatchService {
     userId: string,
     targetUserId: string,
   ): Promise<{
+    status: string;
     matched: boolean;
     userLiked: boolean;
     targetLiked: boolean;
   }> {
-    const [userSwipe, targetSwipe, match] = await Promise.all([
+    console.log('[DEBUG getMatchStatus] INPUT userId:', userId, 'targetUserId:', targetUserId);
+    const allMatches = await this.matchModel.find({
+      $or: [
+        { userId, targetUserId },
+        { userId: targetUserId, targetUserId: userId }
+      ]
+    }).sort({ updatedAt: -1 });
+  
+    console.log('[DEBUG getMatchStatus] ALL MATCHES:', allMatches.map(m => {
+      const doc = m as any;
+      return {
+        _id: doc._id.toString(),
+        status: doc.status,
+        userId: doc.userId,
+        targetUserId: doc.targetUserId,
+        updatedAt: doc.updatedAt,
+      };
+    }));
+    const match = allMatches[0];
+  
+    if (match) {
+      const doc = match as any;
+      console.log('[DEBUG getMatchStatus] PICKED MATCH:', {
+        _id: doc._id.toString(),
+        status: doc.status,
+        userId: doc.userId,
+        targetUserId: doc.targetUserId,
+        updatedAt: doc.updatedAt,
+      });
+    } else {
+      console.log('[DEBUG getMatchStatus] PICKED MATCH: NONE');
+    }
+  
+    const [userSwipe, targetSwipe] = await Promise.all([
       this.swipeModel.findOne({ userId, targetUserId }),
       this.swipeModel.findOne({ userId: targetUserId, targetUserId: userId }),
-      this.matchModel.findOne({
-        $or: [
-          { userId, targetUserId, status: 'active' },
-          { userId: targetUserId, targetUserId: userId, status: 'active' },
-        ],
-      }),
     ]);
-
+  
     return {
-      matched: !!match,
+      status: match?.status ?? 'none',
+      matched: !!match && match.status === 'active',
       userLiked: userSwipe?.action === 'like',
       targetLiked: targetSwipe?.action === 'like',
     };

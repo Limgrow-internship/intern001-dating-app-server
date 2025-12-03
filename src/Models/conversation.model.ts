@@ -24,13 +24,14 @@ export class Conversation {
   })
   status: string;
 
-  @Prop({ type: String })
-  deletedBy?: string; // User ID who deleted (if deleted_for_one)
+  @Prop({ type: [String], default: [] })
+  deletedBy: string[];
+
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);
 
-// Indexes for efficient queries
 ConversationSchema.index({ userId1: 1, lastActivityAt: -1 });
 ConversationSchema.index({ userId2: 1, lastActivityAt: -1 });
 ConversationSchema.index({ status: 1 });
+ConversationSchema.index({ deletedBy: 1 });
