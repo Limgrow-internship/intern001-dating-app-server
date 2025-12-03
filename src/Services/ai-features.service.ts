@@ -180,39 +180,91 @@ Explanation:`;
     if (!profile) {
       throw new Error('Profile not found');
     }
-
+  
     if (!profile.bio || profile.bio.trim().length === 0) {
       throw new Error('No bio to enhance');
     }
-
-    const prompt = `Rewrite this dating profile bio to be more engaging, warm, and attractive while keeping the same information and personality.
-
-Original bio: "${profile.bio}"
-
-Interests: ${profile.interests?.join(', ') || 'Not specified'}
-
-Guidelines:
-- Keep it authentic and natural
-- Make it more engaging and friendly
-- Show personality
-- Keep the same length (or slightly shorter)
-- Don't add fake information
-- Write in first person
-
-Enhanced bio:`;
-
+  
+    const prompt = `Rewrite this dating profile bio to be SHORT, CONCISE, and HIGHLY ENGAGING while keeping the same information and personality.
+  
+  Original bio: "${profile.bio}"
+  
+  Interests: ${profile.interests?.join(', ') || 'Not specified'}
+  
+  Guidelines:
+  - Write SHORT and CONCISE (1-3 sentences, 50-100 words maximum)
+  - Start with a hook that grabs attention immediately
+  - Be punchy, witty, and memorable
+  - Show personality in few words
+  - Use active voice and strong verbs
+  - Keep it authentic and natural
+  - Don't add fake information
+  - Write in first person
+  - Make every word count - remove filler words
+  
+  Enhanced bio:`;
+  
     const response = await this.aiRouter.generate({
       prompt,
       temperature: 0.8,
-      maxTokens: 200,
+      maxTokens: 120,
     });
-
+  
     return {
       originalBio: profile.bio,
       enhancedBio: response.text.trim().replace(/^["']|["']$/g, ''),
       provider: response.provider,
     };
   }
+
+  /**
+   * Generate bio from user prompt/ideas
+   */
+  async generateBio(
+    userId: string,
+    userPrompt: string,
+  ): Promise<{ generatedBio: string; provider: string }> {
+    const profile = await this.profileModel.findOne({ userId });
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+  
+    const prompt = `Generate a SHORT, CONCISE, and HIGHLY ENGAGING dating profile bio based on the user's ideas and information.
+  
+  User's ideas/prompt: "${userPrompt}"
+  
+  User information:
+  - Name: ${profile.firstName || 'User'} ${profile.lastName || ''}
+  - Age: ${profile.age || 'Not specified'}
+  - Gender: ${profile.gender || 'Not specified'}
+  - Interests: ${profile.interests?.join(', ') || 'Not specified'}
+  
+  Guidelines:
+  - Write SHORT and CONCISE (1-3 sentences, 50-100 words maximum)
+  - Start with a hook that grabs attention immediately
+  - Be punchy, witty, and memorable
+  - Show personality in few words
+  - Use active voice and strong verbs
+  - Use the information from the user's prompt
+  - Make it attractive but not overly promotional
+  - Don't add information that wasn't in the user's prompt
+  - Write in first person
+  - Make every word count - remove filler words
+  
+  Generated bio:`;
+  
+    const response = await this.aiRouter.generate({
+      prompt,
+      temperature: 0.8,
+      maxTokens: 150,
+    });
+  
+    return {
+      generatedBio: response.text.trim().replace(/^["']|["']$/g, ''),
+      provider: response.provider,
+    };
+  }
+  
 
   /**
    * Generate date ideas based on common interests
