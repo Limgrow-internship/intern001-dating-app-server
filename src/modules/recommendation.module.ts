@@ -21,6 +21,7 @@ import { DiscoveryController } from '../Controllers/discovery.controller';
 import { PreferenceController } from '../Controllers/preference.controller';
 import { PhotoModule } from './photo.module';
 import { FcmService } from '../Services/fcm.service';
+import { Message, MessageSchema } from 'src/Models/message.model';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { FcmService } from '../Services/fcm.service';
       { name: DailyLimit.name, schema: DailyLimitSchema },
       { name: Conversation.name, schema: ConversationSchema },
       { name: User.name, schema: UserSchema },
+      { name: Message.name, schema: MessageSchema },
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
