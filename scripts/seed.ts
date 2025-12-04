@@ -5,6 +5,7 @@ import { faker } from "@faker-js/faker";
 import { v4 as uuid } from "uuid";
 import bcrypt from "bcryptjs";
 import { v2 as cloudinary } from "cloudinary";
+import type { UploadApiResponse } from "cloudinary";
 
 import { UserSchema } from "../src/Models/user.model";
 import { ProfileSchema } from "../src/Models/profile.model";
@@ -24,23 +25,22 @@ const VIETNAM_CITIES = [
 
 const JOB_LIST = [
     "Accountant", "Actor", "Architect", "Artist", "Banker", "Business Analyst",
-    "Civil Engineer", "Consultant", "Customer Service", "Data Analyst", "Data Scientist",
-    "Designer", "Doctor", "Developer", "Educator", "Engineer", "Entrepreneur",
-    "Fashion Designer", "Freelancer", "Graphic Designer", "HR Specialist", "Lawyer",
-    "Marketing Specialist", "Nurse", "Photographer", "Product Manager", "Project Manager",
+    "Civil Engineer", "Consultant", "Customer Service", "Data Analyst",
+    "Data Scientist", "Designer", "Doctor", "Developer", "Educator",
+    "Engineer", "Entrepreneur", "Fashion Designer", "Freelancer",
+    "Graphic Designer", "HR Specialist", "Lawyer", "Marketing Specialist",
+    "Nurse", "Photographer", "Product Manager", "Project Manager",
     "Scientist", "Software Engineer", "Teacher", "Writer", "KOL", "Other"
 ];
 
 const UNIVERSITY_LIST = [
-    "Đại học Quốc gia Hà Nội", "Đại học Bách khoa Hà Nội", "Đại học Kinh tế Quốc dân",
-    "Đại học Ngoại thương Hà Nội", "Đại học Hà Nội", "Đại học Y Hà Nội",
-    "Học viện Ngoại giao", "Đại học Khoa học Tự nhiên - ĐHQGHN",
-    "Đại học Khoa học Xã hội và Nhân văn - ĐHQGHN",
-    "Đại học Quốc gia TP.HCM", "Đại học Bách khoa TP.HCM", "Đại học Kinh tế TP.HCM",
-    "Đại học Sư phạm TP.HCM", "Đại học FPT", "Đại học RMIT Việt Nam",
-    "Đại học Đà Nẵng", "Đại học Duy Tân", "Đại học Huế", "Đại học Cần Thơ",
-    "Đại học VinUniversity", "Đại học Fulbright Việt Nam",
-    "Khác"
+    "Đại học Quốc gia Hà Nội", "Đại học Bách khoa Hà Nội", "ĐH KTQD",
+    "ĐH Ngoại thương", "ĐH Hà Nội", "ĐH Y Hà Nội", "Học viện Ngoại giao",
+    "ĐH KHTN - ĐHQGHN", "ĐH KHXHNV - ĐHQGHN",
+    "ĐHQG TP.HCM", "ĐH Bách khoa TP.HCM", "UEH",
+    "ĐH Sư phạm TP.HCM", "ĐH FPT", "RMIT Việt Nam",
+    "Đại học Đà Nẵng", "ĐH Duy Tân", "ĐH Huế", "ĐH Cần Thơ",
+    "VinUni", "Fulbright Việt Nam", "Khác"
 ];
 
 cloudinary.config({
@@ -49,24 +49,31 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
-async function uploadRandomPhoto() {
-    const url = `https://picsum.photos/600/800?random=${Math.random()}`;
-    return await cloudinary.uploader.upload(url, {
+
+async function uploadRandomHuman(): Promise<UploadApiResponse> {
+    const api = `https://randomuser.me/api/`;
+
+    const user = await fetch(api).then((r) => r.json());
+    const imageUrl = user.results[0].picture.large;
+
+    return await cloudinary.uploader.upload(imageUrl, {
         folder: "dating_seed",
         upload_preset: process.env.CLOUDINARY_UPLOAD_PRESET,
     });
 }
 
 async function createFakeUser() {
-    const hash = await bcrypt.hash("test1234", 10);
+    const hashed = await bcrypt.hash("test1234", 10);
 
     const emailLocal = faker.internet.username().toLowerCase();
     const email = `${emailLocal}${faker.number.int({ min: 100, max: 999 })}@gmail.com`;
 
+    const userId = uuid();
+
     const user = await UserModel.create({
-        id: uuid(),
-        email: email,
-        password: hash,
+        id: userId,
+        email,
+        password: hashed,
         status: "active",
         optAttempts: 0,
         lastLogin: new Date(),
@@ -77,6 +84,7 @@ async function createFakeUser() {
 
     const first = faker.person.firstName();
     const last = faker.person.lastName();
+
     const city = faker.helpers.arrayElement(VIETNAM_CITIES);
     const job = faker.helpers.arrayElement(JOB_LIST);
     const university = faker.helpers.arrayElement(UNIVERSITY_LIST);
@@ -85,33 +93,25 @@ async function createFakeUser() {
     const lng = faker.number.float({ min: 102, max: 109.5 });
 
     const profile = await ProfileModel.create({
-        userId: user.id,
+        userId,
         firstName: first,
         lastName: last,
         displayName: `${first} ${last}`,
         bio: faker.lorem.sentence(),
-
         city,
         country: "Việt Nam",
 
         gender: faker.helpers.arrayElement(["male", "female"]),
         education: university,
-        job: job,
+        job,
 
-        dateOfBirth: faker.date.birthdate({
-            mode: "age",
-            min: 18,
-            max: 35,
-        }),
-
+        dateOfBirth: faker.date.birthdate({ mode: "age", min: 18, max: 35 }),
         zodiacSign: faker.helpers.arrayElement([
-            "Aries", "Taurus", "Gemini", "Cancer",
-            "Leo", "Virgo", "Libra", "Scorpio",
-            "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+            "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+            "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
         ]),
 
         height: faker.number.int({ min: 150, max: 199 }),
-
         weight: faker.number.int({ min: 45, max: 85 }),
 
         location: {
@@ -121,22 +121,20 @@ async function createFakeUser() {
 
         mode: "dating",
         interests: faker.helpers.arrayElements(
-            ["Music", "Sports", "Movies", "Pets", "Deep talks"],
-            3
+            ["Music", "Sports", "Movies", "Pets", "Deep talks"], 3
         ),
         goals: faker.helpers.arrayElements(
-            ["Serious relationship", "Just vibing", "New friends", "Something casual"],
-            2
+            ["Serious relationship", "Just vibing", "New friends", "Something casual"], 2
         ),
 
         createdAt: new Date(),
         updatedAt: new Date(),
     });
 
-    const uploaded = await uploadRandomPhoto();
+    const uploaded: UploadApiResponse = await uploadRandomHuman();
 
     await PhotoModel.create({
-        userId: user.id,
+        userId,
         url: uploaded.secure_url,
         cloudinaryPublicId: uploaded.public_id,
         type: "avatar",
@@ -145,7 +143,6 @@ async function createFakeUser() {
         createdAt: new Date(),
     });
 
-    console.log("✔ Seeded:", profile.displayName);
 }
 
 (async () => {
@@ -156,5 +153,6 @@ async function createFakeUser() {
     for (let i = 0; i < 1; i++) {
         await createFakeUser();
     }
+    console.log("🎉 DONE! Seeded all fake users.");
     process.exit(0);
 })();

@@ -101,21 +101,24 @@ export class Profile {
   @Prop()
   job?: string; // Job title
 
-  @Prop({ type: Map, of: String })
-  openQuestionAnswers?: Record<string, string>;
-
+  @Prop({
+    type: Map,
+    of: String,
+    default: () => new Map()
+  })
+  openQuestionAnswers: Map<string, string>;
 }
 
 export const ProfileSchema = SchemaFactory.createForClass(Profile);
 
 // Pre-save hook to validate and clean up invalid location data
-ProfileSchema.pre('save', function(next) {
+ProfileSchema.pre('save', function (next) {
   // If location exists but is invalid (missing coordinates or empty coordinates), remove it
   if (this.location) {
-    if (!this.location.coordinates || 
-        !Array.isArray(this.location.coordinates) || 
-        this.location.coordinates.length < 2 ||
-        this.location.coordinates.some(coord => coord === null || coord === undefined || isNaN(coord))) {
+    if (!this.location.coordinates ||
+      !Array.isArray(this.location.coordinates) ||
+      this.location.coordinates.length < 2 ||
+      this.location.coordinates.some(coord => coord === null || coord === undefined || isNaN(coord))) {
       // Invalid location - remove it
       this.location = undefined;
     }
@@ -124,17 +127,17 @@ ProfileSchema.pre('save', function(next) {
 });
 
 // Pre-update hook to validate location in update operations
-ProfileSchema.pre(['updateOne', 'findOneAndUpdate', 'updateMany'], function(next) {
+ProfileSchema.pre(['updateOne', 'findOneAndUpdate', 'updateMany'], function (next) {
   const update = this.getUpdate() as any;
-  
+
   // Handle $set operations
   if (update.$set) {
     if (update.$set.location) {
       const loc = update.$set.location;
-      if (!loc.coordinates || 
-          !Array.isArray(loc.coordinates) || 
-          loc.coordinates.length < 2 ||
-          loc.coordinates.some((coord: any) => coord === null || coord === undefined || isNaN(coord))) {
+      if (!loc.coordinates ||
+        !Array.isArray(loc.coordinates) ||
+        loc.coordinates.length < 2 ||
+        loc.coordinates.some((coord: any) => coord === null || coord === undefined || isNaN(coord))) {
         // Invalid location - remove it
         delete update.$set.location;
         // Also unset any existing invalid location on the document
@@ -145,14 +148,14 @@ ProfileSchema.pre(['updateOne', 'findOneAndUpdate', 'updateMany'], function(next
       }
     }
   }
-  
+
   // Handle direct location assignment
   if (update.location) {
     const loc = update.location;
-    if (!loc.coordinates || 
-        !Array.isArray(loc.coordinates) || 
-        loc.coordinates.length < 2 ||
-        loc.coordinates.some((coord: any) => coord === null || coord === undefined || isNaN(coord))) {
+    if (!loc.coordinates ||
+      !Array.isArray(loc.coordinates) ||
+      loc.coordinates.length < 2 ||
+      loc.coordinates.some((coord: any) => coord === null || coord === undefined || isNaN(coord))) {
       // Invalid location - remove it
       delete update.location;
       // Also unset any existing invalid location on the document
@@ -162,7 +165,7 @@ ProfileSchema.pre(['updateOne', 'findOneAndUpdate', 'updateMany'], function(next
       update.$unset.location = '';
     }
   }
-  
+
   // Always check and clean up invalid location in existing documents
   // This ensures that even if we're not updating location, we clean up bad data
   if (!update.$set || !update.$set.location) {
@@ -170,7 +173,7 @@ ProfileSchema.pre(['updateOne', 'findOneAndUpdate', 'updateMany'], function(next
     // Note: This is a best-effort cleanup - MongoDB will still validate during the update
     // The sparse index helps, but we can't fully prevent the error without cleaning the data first
   }
-  
+
   next();
 });
 
