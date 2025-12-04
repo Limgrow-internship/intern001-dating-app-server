@@ -48,12 +48,15 @@ async function bootstrap() {
     });
 
     const port = process.env.PORT || 3000;
-    console.log(`📚 Swagger documentation available at: http://localhost:${port}/api-docs`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`Swagger documentation available at: http://localhost:${port}/api-docs`);
+    }
   }
 
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
-  console.log(`🚀 Application is running on: http://localhost:${port}`);
-  console.log(`📡 API endpoint: http://localhost:${port}/api`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`Application is running on: http://localhost:${port}`);
+  }
 }
 bootstrap();

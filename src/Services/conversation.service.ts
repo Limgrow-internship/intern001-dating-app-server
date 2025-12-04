@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Match, MatchDocument } from 'src/Models/match.model';
+import { AI_ASSISTANT_USER_ID, AI_ASSISTANT_NAME } from 'src/common/constants';
+import { ClientSession } from 'mongoose';
 
 type MatchedUserResult = {
   matchId: any;
@@ -39,7 +41,81 @@ export class ConversationService {
     return age;
   }
 
+  /**
+   * Ensure AI conversation exists for user, create if not
+   */
+  private async ensureAIConversation(userId: string): Promise<string | null> {
+    // Check if AI conversation already exists
+    const existingAIConversation = await this.conversationModel.findOne({
+      $or: [
+        { userId1: userId, userId2: AI_ASSISTANT_USER_ID },
+        { userId1: AI_ASSISTANT_USER_ID, userId2: userId }
+      ]
+    }).lean() as any;
+
+    if (existingAIConversation) {
+      return existingAIConversation.matchId;
+    }
+
+    // Create AI match and conversation
+    const session: ClientSession = await this.matchModel.db.startSession();
+    session.startTransaction();
+
+    try {
+      // Create match with AI
+      const [userId1, userId2] = userId < AI_ASSISTANT_USER_ID 
+        ? [userId, AI_ASSISTANT_USER_ID] 
+        : [AI_ASSISTANT_USER_ID, userId];
+
+      // Check if match already exists
+      const existingMatch = await this.matchModel
+        .findOne({
+          userId: userId1,
+          targetUserId: userId2,
+        })
+        .session(session);
+
+      let matchId: string;
+      if (existingMatch) {
+        matchId = (existingMatch as any)._id.toString();
+      } else {
+        const matchData = {
+          userId: userId1,
+          targetUserId: userId2,
+          status: 'active',
+          matchedAt: new Date(),
+        };
+
+        const [match] = await this.matchModel.create([matchData], { session });
+        matchId = (match as any)._id.toString();
+      }
+
+      // Create conversation
+      const conversationData = {
+        matchId: matchId,
+        userId1: userId,
+        userId2: AI_ASSISTANT_USER_ID,
+        status: 'active',
+        lastActivityAt: new Date(),
+      };
+
+      await this.conversationModel.create([conversationData], { session });
+
+      await session.commitTransaction();
+      return matchId;
+    } catch (error) {
+      await session.abortTransaction();
+      console.error('Error creating AI conversation:', error);
+      return null;
+    } finally {
+      session.endSession();
+    }
+  }
+
   async listMatchedUsers(currentUserId: string): Promise<MatchedUserResult[]> {
+    // Ensure AI conversation exists
+    await this.ensureAIConversation(currentUserId);
+
     const activeMatches = await this.matchModel.find({
       $or: [
         { userId: currentUserId },
@@ -60,7 +136,16 @@ export class ConversationService {
       ]
     }).lean();
   
-    const matchedUserIds = conversations.map(conv =>
+    // Separate AI conversation from regular conversations
+    const aiConversation = conversations.find(conv => 
+      conv.userId1 === AI_ASSISTANT_USER_ID || conv.userId2 === AI_ASSISTANT_USER_ID
+    );
+    
+    const regularConversations = conversations.filter(conv => 
+      conv.userId1 !== AI_ASSISTANT_USER_ID && conv.userId2 !== AI_ASSISTANT_USER_ID
+    );
+
+    const matchedUserIds = regularConversations.map(conv =>
       conv.userId1 === currentUserId ? conv.userId2 : conv.userId1
     );
   
@@ -72,7 +157,26 @@ export class ConversationService {
     }).lean();
   
     const results: MatchedUserResult[] = [];
-    for (const conv of conversations) {
+    
+    // Add AI conversation first
+    if (aiConversation) {
+      results.push({
+        matchId: aiConversation.matchId,
+        lastActivityAt: aiConversation.lastActivityAt,
+        matchedUser: {
+          userId: AI_ASSISTANT_USER_ID,
+          firstName: AI_ASSISTANT_NAME,
+          lastName: '',
+          url: null,
+          age: null,
+          city: '',
+        },
+        status: 'active'
+      } as any);
+    }
+    
+    // Add regular conversations
+    for (const conv of regularConversations) {
       const otherUserId = conv.userId1 === currentUserId ? conv.userId2 : conv.userId1;
       const profile = profiles.find(p => p.userId === otherUserId);
   

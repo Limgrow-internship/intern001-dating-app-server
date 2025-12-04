@@ -5,6 +5,7 @@ import {
   Request,
   UseGuards,
   Param,
+  Body,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,6 +17,7 @@ import {
 import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
 import { AIRouterService } from '../Services/ai-router.service';
 import { AIFeaturesService } from '../Services/ai-features.service';
+import { GenerateBioDto } from '../DTO/generate-bio.dto';
 
 @ApiTags('AI Features')
 @Controller('ai')
@@ -124,6 +126,27 @@ export class AIController {
   async enhanceBio(@Request() req) {
     const userId = req.user.userId;
     const result = await this.aiFeatures.enhanceBio(userId);
+    return result;
+  }
+
+  @Post('generate-bio')
+  @ApiOperation({
+    summary: 'Generate bio from user prompt',
+    description: 'AI generates a dating profile bio based on user ideas and prompt',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Returns AI-generated bio',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid prompt' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Profile not found' })
+  async generateBio(@Request() req, @Body() generateBioDto: GenerateBioDto) {
+    const userId = req.user.userId;
+    const result = await this.aiFeatures.generateBio(
+      userId,
+      generateBioDto.prompt,
+    );
     return result;
   }
 

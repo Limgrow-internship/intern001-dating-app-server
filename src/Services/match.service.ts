@@ -171,7 +171,6 @@ export class MatchService {
     userLiked: boolean;
     targetLiked: boolean;
   }> {
-    console.log('[DEBUG getMatchStatus] INPUT userId:', userId, 'targetUserId:', targetUserId);
     const allMatches = await this.matchModel.find({
       $or: [
         { userId, targetUserId },
@@ -179,30 +178,7 @@ export class MatchService {
       ]
     }).sort({ updatedAt: -1 });
   
-    console.log('[DEBUG getMatchStatus] ALL MATCHES:', allMatches.map(m => {
-      const doc = m as any;
-      return {
-        _id: doc._id.toString(),
-        status: doc.status,
-        userId: doc.userId,
-        targetUserId: doc.targetUserId,
-        updatedAt: doc.updatedAt,
-      };
-    }));
     const match = allMatches[0];
-  
-    if (match) {
-      const doc = match as any;
-      console.log('[DEBUG getMatchStatus] PICKED MATCH:', {
-        _id: doc._id.toString(),
-        status: doc.status,
-        userId: doc.userId,
-        targetUserId: doc.targetUserId,
-        updatedAt: doc.updatedAt,
-      });
-    } else {
-      console.log('[DEBUG getMatchStatus] PICKED MATCH: NONE');
-    }
   
     const [userSwipe, targetSwipe] = await Promise.all([
       this.swipeModel.findOne({ userId, targetUserId }),
