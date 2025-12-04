@@ -61,7 +61,7 @@ export class ChatService {
           message: decrypted || msg.message,
         };
       } catch (e) {
-        console.error('Decrypt fail message:', msg.message, e);
+        console.error('Decrypt fail message: [encrypted]', e.message);
         return {
           ...msg.toObject(),
           message: '[Decrypt error]',
