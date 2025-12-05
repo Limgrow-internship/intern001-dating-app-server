@@ -9,6 +9,7 @@ import { Conversation, ConversationSchema } from 'src/Models/conversation.model'
 import { ChatService } from 'src/Services/chat.service';
 import { CloudinaryService } from 'src/Services/cloudinary.service';
 import { AIModule } from './ai.module';
+import { Match, MatchSchema } from 'src/Models/match.model';
 
 
 @Module({
@@ -16,6 +17,7 @@ import { AIModule } from './ai.module';
     MongooseModule.forFeature([
       { name: Message.name, schema: MessageSchema },
       { name: Conversation.name, schema: ConversationSchema },
+      { name: Match.name, schema: MatchSchema },
     ]),
     AIModule,
   ],
