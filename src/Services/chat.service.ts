@@ -113,18 +113,23 @@ export class ChatService {
     );
   }
 
-  async getConversationHistoryForAI(matchId: string, limit: number = 10): Promise<string[]> {
+  /**
+   * Get conversation history for AI context
+   */
+  async getConversationHistoryForAI(matchId: string, limit: number = 10, aiProfile?: any): Promise<string[]> {
     const messages = await this.messageModel
       .find({ matchId })
       .sort({ timestamp: -1 })
       .limit(limit)
       .lean();
-
+    
+    const aiName = aiProfile?.firstName || 'Linh';
+    
     return messages
       .reverse()
       .map(msg => {
         const decrypted = msg.message ? decryptMessage(msg.message) : '';
-        const sender = msg.senderId === AI_ASSISTANT_USER_ID ? 'AI' : 'User';
+        const sender = msg.senderId === AI_ASSISTANT_USER_ID ? aiName : 'User';
         return `${sender}: ${decrypted || '[Media]'}`;
       });
   }

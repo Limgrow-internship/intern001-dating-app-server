@@ -6,6 +6,7 @@ import { MediaController } from 'src/Controllers/upload-img.controller';
 import { ChatGateway } from 'src/gateways/chat.gateway';
 import { Message, MessageSchema } from 'src/Models/message.model';
 import { Conversation, ConversationSchema } from 'src/Models/conversation.model';
+import { Profile, ProfileSchema } from 'src/Models/profile.model';
 import { ChatService } from 'src/Services/chat.service';
 import { CloudinaryService } from 'src/Services/cloudinary.service';
 import { AIModule } from './ai.module';
@@ -17,6 +18,7 @@ import { Match, MatchSchema } from 'src/Models/match.model';
     MongooseModule.forFeature([
       { name: Message.name, schema: MessageSchema },
       { name: Conversation.name, schema: ConversationSchema },
+      { name: Profile.name, schema: ProfileSchema },
       { name: Match.name, schema: MatchSchema },
     ]),
     AIModule,
