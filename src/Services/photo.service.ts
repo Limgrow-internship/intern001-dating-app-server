@@ -1,13 +1,15 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Photo, PhotoType, PhotoSource } from '../Models/photo.model';
+import { Photo, PhotoType, PhotoSource, PhotoDocument } from '../Models/photo.model';
 import { CloudinaryService } from './cloudinary.service';
+import { FaceEmbeddingResult, getFaceEmbedding } from './uniface.service';
+import { cosineSimilarity } from 'src/Utils/cosine-similarity';
 
 @Injectable()
 export class PhotoService {
   constructor(
-    @InjectModel(Photo.name) private photoModel: Model<Photo>,
+    @InjectModel(Photo.name) private photoModel: Model<PhotoDocument>,
     private cloudinaryService: CloudinaryService,
   ) { }
   async uploadPhoto(
@@ -16,11 +18,72 @@ export class PhotoService {
     type: PhotoType = PhotoType.GALLERY,
     source: PhotoSource = PhotoSource.UPLOAD,
   ): Promise<Photo> {
-    const uploadResult = await this.cloudinaryService.uploadFile(file);
+    if (type === PhotoType.SELFIE) {
+      const embResult = await getFaceEmbedding(file.buffer, file.originalname) as FaceEmbeddingResult;
+      if (!embResult.verified || !embResult.embedding)
+        throw new BadRequestException('No face detected in selfie!');
+      const rawEmbedding = embResult.embedding;
+      const embedding = Array.isArray(rawEmbedding[0]) ? rawEmbedding[0] : rawEmbedding;
 
+      const others = await this.photoModel.find({
+        userId: { $ne: userId },
+        type: PhotoType.SELFIE,
+        isActive: true,
+        embedding: { $exists: true, $ne: null }
+      });
+
+      let isVerified = true;
+      const threshold = 0.5; 
+      if (others.length > 0) {
+        const isDuplicate = others.some(
+          p => cosineSimilarity(embedding as number[], p.embedding as number[]) >= threshold
+        );
+        if (isDuplicate) {
+          throw new BadRequestException('Face already exists for another user (not unique selfie)');
+        }
+      }
+     
+      const uploadResult = await this.cloudinaryService.uploadFile(file);
+
+      let existedSelfie = await this.photoModel.findOne({ userId, type: PhotoType.SELFIE, isActive: true });
+
+      if (existedSelfie) {
+      
+        existedSelfie.url = uploadResult.secure_url;
+        existedSelfie.cloudinaryPublicId = uploadResult.public_id;
+        existedSelfie.width = uploadResult.width;
+        existedSelfie.height = uploadResult.height;
+        existedSelfie.fileSize = uploadResult.bytes;
+        existedSelfie.format = uploadResult.format;
+        existedSelfie.embedding = embedding;
+        existedSelfie.updatedAt = new Date();
+        existedSelfie.isVerified = isVerified;
+        await existedSelfie.save();
+        return existedSelfie;
+      } else {
+      
+        return await this.photoModel.create({
+          userId,
+          url: uploadResult.secure_url,
+          cloudinaryPublicId: uploadResult.public_id,
+          type,
+          source,
+          isPrimary: false,
+          order: 1,
+          width: uploadResult.width,
+          height: uploadResult.height,
+          fileSize: uploadResult.bytes,
+          format: uploadResult.format,
+          isActive: true,
+          isVerified,
+          embedding
+        });
+      }
+    }
+    const uploadResult = await this.cloudinaryService.uploadFile(file);
     const maxOrder = await this.getMaxOrder(userId);
 
-    const photo = await this.photoModel.create({
+    return await this.photoModel.create({
       userId,
       url: uploadResult.secure_url,
       cloudinaryPublicId: uploadResult.public_id,
@@ -33,10 +96,8 @@ export class PhotoService {
       fileSize: uploadResult.bytes,
       format: uploadResult.format,
       isActive: true,
-      isVerified: false,
+      isVerified: false
     });
-
-    return photo;
   }
 
   async uploadFromUrl(
