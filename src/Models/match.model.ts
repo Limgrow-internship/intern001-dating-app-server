@@ -24,6 +24,9 @@ export class Match {
   @Prop({ type: Date })
   unmatchedAt?: Date; // When either user unmatched
 
+  @Prop({ required: false, type: String })
+  blockerId?: string;
+
   @Prop({ type: Date })
   lastMessageAt?: Date; // Last message timestamp in conversation
 }
