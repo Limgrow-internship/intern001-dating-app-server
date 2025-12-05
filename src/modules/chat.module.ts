@@ -10,6 +10,7 @@ import { Profile, ProfileSchema } from 'src/Models/profile.model';
 import { ChatService } from 'src/Services/chat.service';
 import { CloudinaryService } from 'src/Services/cloudinary.service';
 import { AIModule } from './ai.module';
+import { Match, MatchSchema } from 'src/Models/match.model';
 
 
 @Module({
@@ -18,6 +19,7 @@ import { AIModule } from './ai.module';
       { name: Message.name, schema: MessageSchema },
       { name: Conversation.name, schema: ConversationSchema },
       { name: Profile.name, schema: ProfileSchema },
+      { name: Match.name, schema: MatchSchema },
     ]),
     AIModule,
   ],

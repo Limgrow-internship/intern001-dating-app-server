@@ -15,20 +15,20 @@ import { AI_ASSISTANT_USER_ID } from 'src/common/constants';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
-@WebSocketGateway({ 
-  cors: { 
-    origin: process.env.NODE_ENV === 'production' 
+@WebSocketGateway({
+  cors: {
+    origin: process.env.NODE_ENV === 'production'
       ? ['https://intern001-dating-app-server.limgrow.com', 'https://*.limgrow.com']
       : '*',
-    credentials: true 
-  }, 
+    credentials: true
+  },
   namespace: '/chat',
   transports: ['websocket', 'polling'],
   allowEIO3: true
 })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
-  
+
   constructor(
     private readonly chatService: ChatService,
     private readonly aiRouter: AIRouterService,
@@ -47,12 +47,12 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
   @SubscribeMessage('join_room')
   async handleJoinRoom(
-    @MessageBody() data: { matchId: string },
+    @MessageBody() data: { matchId: string, userId: string },
     @ConnectedSocket() client: Socket,
   ) {
     try {
       client.join(data.matchId);
-      const history = await this.chatService.getMessages(data.matchId);
+      const history = await this.chatService.getMessages(data.matchId, data.userId);
       client.emit('chat_history', history);
     } catch (error) {
       console.error('Error in join_room:', error.message);
@@ -72,6 +72,13 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     },
     @ConnectedSocket() client: Socket,
   ) {
+    let delivered = true;
+  const match = await this.chatService.getMatchById(data.matchId);
+  if (match && match.status === 'blocked') {
+    if (match.blockerId !== data.senderId) {
+      delivered = false;
+    }
+  }
     const msgObj = {
       senderId: data.senderId,
       message: data.message,
@@ -80,14 +87,25 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       imgChat: data.imgChat,
       timestamp: new Date(),
       matchId: data.matchId,
+      delivered,
     };
-    
+
     try {
-      await this.chatService.sendMessage(msgObj);
+      const result = await this.chatService.sendMessage(msgObj);
+      const match = await this.chatService.getMatchById(data.matchId);
+
+      if (match && match.status === 'blocked') {
+        if (match.blockerId !== data.senderId) {
+          client.emit('receive_message', msgObj); // chỉ gửi về cho sender
+          return;
+        }
+      
+        return;
+      }
+
       this.server.to(data.matchId).emit('receive_message', msgObj);
 
       const isAI = await this.chatService.isAIConversation(data.matchId);
-      
       if (isAI && data.message && data.senderId !== AI_ASSISTANT_USER_ID) {
         this.generateAIResponse(data.matchId, data.senderId, data.message).catch(
           (error) => {
@@ -160,8 +178,8 @@ Bạn đang chat với ${userName} trên một ứng dụng dating. Hãy trò ch
       throw error;
     }
   }
-  
+
   emitMessageToRoom(matchId: string, msg: any) {
     this.server.to(matchId).emit('receive_message', msg);
   }
-} 
+}

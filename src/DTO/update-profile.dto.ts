@@ -163,7 +163,7 @@ export class UpdateProfileDto {
         additionalProperties: { type: 'string' }
     })
     @IsOptional()
-    openQuestionAnswers?: Record<string, string>;
+    openQuestionAnswers?: Map<string, string>;
 
     @ApiPropertyOptional({
         description: 'Array of photo URLs',
