@@ -11,6 +11,8 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 .env.*
+/uniface-api/venv
+/uniface-api/__pycache__/
 
 # Firebase Service Account
 firebase-service-account.json

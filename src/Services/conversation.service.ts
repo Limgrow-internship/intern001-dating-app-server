@@ -121,12 +121,12 @@ export class ConversationService {
         { userId: currentUserId },
         { targetUserId: currentUserId }
       ],
-      status: { $in: ['active', 'unmatched'] }
+      status: { $in: ['active', 'unmatched', 'blocked'] }
     }).select('_id userId targetUserId status').lean();
   
     const matchIdToStatus = new Map();
     activeMatches.forEach(m => matchIdToStatus.set(m._id.toString(), m.status));
-  
+
     const matchIds = activeMatches.map(m => m._id);
     const conversations = await this.conversationModel.find({
       matchId: { $in: matchIds },

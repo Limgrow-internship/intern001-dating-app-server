@@ -170,6 +170,7 @@ export class MatchService {
     matched: boolean;
     userLiked: boolean;
     targetLiked: boolean;
+    blockerId?: string | null;
   }> {
     const allMatches = await this.matchModel.find({
       $or: [
@@ -190,6 +191,7 @@ export class MatchService {
       matched: !!match && match.status === 'active',
       userLiked: userSwipe?.action === 'like',
       targetLiked: targetSwipe?.action === 'like',
+      blockerId: match?.blockerId ?? null,
     };
   }
 

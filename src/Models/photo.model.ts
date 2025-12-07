@@ -55,6 +55,9 @@ export class Photo extends Document {
   @Prop({ default: true })
   isActive: boolean;
 
+  @Prop({type: [Number]})
+  embedding?: number[];
+
   createdAt?: Date;
   updatedAt?: Date;
 }
