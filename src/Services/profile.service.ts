@@ -117,39 +117,87 @@ export class ProfileService {
 
             const updateData: any = { ...updateProfileDto };
 
+            const lngHelper = updateProfileDto.longitude ?? (updateProfileDto as any).lng;
+            const latHelper = updateProfileDto.latitude ?? (updateProfileDto as any).lat;
+
+            // Build location from helper fields if location not provided explicitly
+            if (!updateProfileDto.location) {
+                if (lngHelper !== undefined && latHelper !== undefined) {
+                    updateProfileDto.location = {
+                        longitude: lngHelper,
+                        latitude: latHelper,
+                    };
+                }
+            }
+
             if (updateProfileDto.location) {
                 const loc: any = updateProfileDto.location;
 
+                // Helper to normalize various input shapes into GeoJSON Point
+                const parseLocation = (lngValue: any, latValue: any) => {
+                    const lng = Number(lngValue);
+                    const lat = Number(latValue);
+                    if (isNaN(lng) || isNaN(lat)) return null;
+                    return {
+                        type: "Point",
+                        coordinates: [lng, lat],
+                    };
+                };
+
+                // Helper to parse string like "lat, lng" or "lng, lat"
+                const parseStringLocation = (value: string) => {
+                    const parts = value.split(',').map(p => p.trim());
+                    if (parts.length < 2) return null;
+                    const a = Number(parts[0]);
+                    const b = Number(parts[1]);
+                    if (isNaN(a) || isNaN(b)) return null;
+                    // Heuristic: lat is usually within [-90, 90], lng within [-180, 180]
+                    const aLooksLikeLat = Math.abs(a) <= 90;
+                    const bLooksLikeLat = Math.abs(b) <= 90;
+                    if (aLooksLikeLat && !bLooksLikeLat) {
+                        // Assume "lat, lng" → GeoJSON needs [lng, lat]
+                        return parseLocation(b, a);
+                    }
+                    if (!aLooksLikeLat && bLooksLikeLat) {
+                        // Assume "lng, lat"
+                        return parseLocation(a, b);
+                    }
+                    // Fallback: treat as "lng, lat"
+                    return parseLocation(a, b);
+                };
+
+                let parsedLocation: any = null;
+
+                // Case 1: { coordinates: [lng, lat] }
                 if (
                     typeof loc === "object" &&
                     Array.isArray(loc.coordinates) &&
                     loc.coordinates.length >= 2
                 ) {
-                    const lng = Number(loc.coordinates[0]);
-                    const lat = Number(loc.coordinates[1]);
-
-                    if (!isNaN(lng) && !isNaN(lat)) {
-                        updateData.location = {
-                            type: "Point",
-                            coordinates: [lng, lat],
-                        };
-                    } else {
-                        delete updateData.location;
-                    }
+                    parsedLocation = parseLocation(loc.coordinates[0], loc.coordinates[1]);
+                }
+                // Case 2: { longitude, latitude }
+                else if (typeof loc === "object" && "longitude" in loc && "latitude" in loc) {
+                    parsedLocation = parseLocation(loc.longitude, loc.latitude);
+                }
+                // Case 3: { lng, lat }
+                else if (typeof loc === "object" && "lng" in loc && "lat" in loc) {
+                    parsedLocation = parseLocation((loc as any).lng, (loc as any).lat);
+                }
+                // Case 4: [lng, lat]
+                else if (Array.isArray(loc) && loc.length >= 2) {
+                    parsedLocation = parseLocation(loc[0], loc[1]);
+                }
+                // Case 5: string "lat, lng" or "lng, lat"
+                else if (typeof loc === "string") {
+                    parsedLocation = parseStringLocation(loc);
                 }
 
-                else if (typeof loc === "object" && "longitude" in loc && "latitude" in loc) {
-                    const lng = Number(loc.longitude);
-                    const lat = Number(loc.latitude);
-
-                    if (!isNaN(lng) && !isNaN(lat)) {
-                        updateData.location = {
-                            type: "Point",
-                            coordinates: [lng, lat],
-                        };
-                    } else {
-                        delete updateData.location;
-                    }
+                if (parsedLocation) {
+                    updateData.location = parsedLocation;
+                    // Keep doc in sync so later save() does not drop location
+                    (p as any).location = parsedLocation;
+                    p.markModified('location');
                 } else {
                     delete updateData.location;
                 }
