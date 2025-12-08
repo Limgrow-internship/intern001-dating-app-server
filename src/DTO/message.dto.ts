@@ -6,4 +6,5 @@ export interface MessageDTO {
     imgChat?: string;
     duration?: number;
     timestamp?: Date;
+    delivered?: boolean;
   }

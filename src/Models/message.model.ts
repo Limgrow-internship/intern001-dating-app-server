@@ -26,6 +26,9 @@ export class Message {
   @Prop({ default: Date.now })
   timestamp: Date;
 
+  @Prop({ default: true })
+  delivered: boolean;
+
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

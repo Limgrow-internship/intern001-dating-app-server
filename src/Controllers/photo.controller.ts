@@ -78,18 +78,7 @@ export class PhotoController {
       type || PhotoType.GALLERY,
     );
 
-    return {
-      message: 'Photo uploaded successfully',
-      photo: {
-        id: photo._id,
-        url: photo.url,
-        type: photo.type,
-        source: photo.source,
-        isPrimary: photo.isPrimary,
-        order: photo.order,
-        createdAt: photo.createdAt,
-      },
-    };
+    return photo;
   }
 
   @Get()

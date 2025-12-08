@@ -644,40 +644,29 @@ export class DiscoveryService {
     }
 
     const targetProfile = await this.profileModel.findOne({ userId: targetUserId });
-    if (!targetProfile) {
-      throw new NotFoundException('Target user not found');
-    }
-
-    // Check if already blocked
-    const existingBlock = await this.blockedUserModel.findOne({
-      blockerUserId: userId,
-      blockedUserId: targetUserId,
-    });
-
-    if (existingBlock) {
-      throw new BadRequestException('User already blocked');
-    }
-
-    // Create block
-    await this.blockedUserModel.create({
-      blockerUserId: userId,
-      blockedUserId: targetUserId,
-      reason: reason || null,
-      blockedAt: new Date(),
-    });
-
-    // If there's a match, unmatch them
-    const existingMatch = await this.matchModel.findOne({
-      $or: [
-        { userId, targetUserId, status: 'active' },
-        { userId: targetUserId, targetUserId: userId, status: 'active' },
-      ],
-    });
-
-    if (existingMatch) {
-      existingMatch.status = 'unmatched';
-      existingMatch.unmatchedAt = new Date();
-      await existingMatch.save();
+    if (!targetProfile) throw new NotFoundException('Target user not found');
+  
+    const updated = await this.matchModel.updateMany(
+      {
+        $or: [
+          { userId: userId, targetUserId: targetUserId },
+          { userId: targetUserId, targetUserId: userId }
+        ],
+        status: 'active',
+      },
+      {
+        $set: { status: 'blocked', unmatchedAt: new Date() },
+      }
+    );
+  
+    if (!updated.matchedCount) {
+      await this.matchModel.create({
+        userId: userId,
+        targetUserId: targetUserId,
+        status: 'blocked',
+        matchedAt: new Date(),
+        unmatchedAt: new Date(),
+      });
     }
   }
 

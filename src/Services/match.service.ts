@@ -170,6 +170,7 @@ export class MatchService {
     matched: boolean;
     userLiked: boolean;
     targetLiked: boolean;
+    blockerId?: string | null;
   }> {
     const allMatches = await this.matchModel.find({
       $or: [
@@ -190,6 +191,7 @@ export class MatchService {
       matched: !!match && match.status === 'active',
       userLiked: userSwipe?.action === 'like',
       targetLiked: targetSwipe?.action === 'like',
+      blockerId: match?.blockerId ?? null,
     };
   }
 
@@ -211,7 +213,7 @@ export class MatchService {
     });
 
     const matchedUserIds = matchedRecords.map((m) =>
-      m.userId === userId ? m.targetUserId : m.userId
+      m.userId === userId ? m.targetUserId : m.userId,
     );
 
     const filteredUserIds = userIds.filter(
@@ -228,18 +230,19 @@ export class MatchService {
       profiles.map(async (profile) => {
         const uid = profile.userId;
 
-        const [photos, primaryPhoto] = await Promise.all([
-          this.photoService.getUserPhotos(uid),
-          this.photoService.getPrimaryPhoto(uid),
-        ]);
+        const photos = await this.photoService.getUserPhotos(uid);
+
+        const primaryPhoto = photos.find((p) => p.isPrimary) || null;
 
         return {
           userId: uid,
           firstName: profile.firstName,
           lastName: profile.lastName,
-          displayName: `${profile.firstName ?? ""} ${profile.lastName ?? ""}`.trim(),
+          displayName:
+            `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim(),
           age: profile.age,
           city: profile.city ?? null,
+
           avatar: primaryPhoto?.url || null,
 
           photos: photos.map((p) => ({
