@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, isValidObjectId } from 'mongoose';
 import { encryptMessage, decryptMessage } from '../common/encryption.util';
 import { Message, MessageDocument } from 'src/Models/message.model';
 import { MessageDTO } from 'src/DTO/message.dto';
@@ -20,6 +20,7 @@ export class ChatService {
   ) {}
 
   async getMatchById(matchId: string): Promise<MatchDocument | null> {
+    if (!isValidObjectId(matchId)) return null;
     return this.matchModel.findById(matchId);
   }
 
@@ -38,7 +39,9 @@ export class ChatService {
   async sendMessage(messageDto: MessageDTO) {
     const matchId = messageDto.matchId;
     const senderId = messageDto.senderId;
-    const match = await this.matchModel.findById(matchId).lean();
+    const match = isValidObjectId(matchId)
+      ? await this.matchModel.findById(matchId).lean()
+      : null;
 
    
     const encryptedMessage = messageDto.message
@@ -75,7 +78,9 @@ export class ChatService {
   }
 
   async getMessages(matchId: string, forUserId?: string) {
-    const match = await this.matchModel.findById(matchId).lean();
+    const match = isValidObjectId(matchId)
+      ? await this.matchModel.findById(matchId).lean()
+      : null;
     const docs = await this.messageModel.find({ matchId }).exec();
   
     let messages = docs;
