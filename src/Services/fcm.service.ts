@@ -8,6 +8,7 @@ import { Profile, ProfileDocument } from '../Models/profile.model';
 export class FcmService implements OnModuleInit {
   private readonly logger = new Logger(FcmService.name);
   private initialized = false;
+  private chatCooldown = new Map<string, number>();
 
   constructor(
     @InjectModel(Profile.name)
@@ -110,6 +111,102 @@ export class FcmService implements OnModuleInit {
     }
     
     return 'com.intern001.dating.OPEN_PROFILE';
+  }
+
+  private getChatCooldownMs(): number {
+    const envVal = process.env.CHAT_FCM_COOLDOWN_MS;
+    const parsed = envVal ? Number(envVal) : NaN;
+    return !isNaN(parsed) && parsed >= 0 ? parsed : 30000; // default 30s
+  }
+
+  async sendChatMessageNotification(params: {
+    targetUserId: string;
+    targetFcmToken: string;
+    senderId: string;
+    senderName: string;
+    matchId: string;
+    messagePreview?: string;
+  }): Promise<void> {
+    if (!this.initialized) {
+      this.logger.warn('FCM not initialized, skipping notification');
+      return;
+    }
+
+    const {
+      targetUserId,
+      targetFcmToken,
+      senderId,
+      senderName,
+      matchId,
+      messagePreview,
+    } = params;
+
+    if (!targetFcmToken) {
+      this.logger.warn(`No FCM token for user ${targetUserId}`);
+      return;
+    }
+
+    try {
+      const key = `${targetUserId}:${matchId}`;
+      const now = Date.now();
+      const cooldownMs = this.getChatCooldownMs();
+      const lastSent = this.chatCooldown.get(key) || 0;
+      if (now - lastSent < cooldownMs) {
+        return; // within cooldown window, skip
+      }
+
+      const targetProfile = await this.profileModel.findOne({ userId: targetUserId }).select('mode');
+      const userMode = targetProfile?.mode || null;
+
+      const deeplink = this.getDeeplink('chat', { matchId });
+
+      const message: admin.messaging.Message = {
+        token: targetFcmToken,
+        data: {
+          type: 'chat',
+          matchId,
+          senderId,
+          senderName,
+          navigate_to: 'chat',
+          userMode: userMode || 'dating',
+          title: senderName,
+          message: messagePreview || '[New message]',
+          deeplink,
+        },
+        notification: {
+          title: senderName,
+          body: messagePreview || 'Bạn có tin nhắn mới',
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            sound: 'default',
+            channelId: 'chat',
+            clickAction: 'com.intern001.dating.OPEN_CHAT',
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'default',
+              badge: 1,
+            },
+          },
+        },
+      };
+
+      await admin.messaging().send(message);
+      this.chatCooldown.set(key, now);
+    } catch (error: any) {
+      if (
+        error.code === 'messaging/invalid-registration-token' ||
+        error.code === 'messaging/registration-token-not-registered'
+      ) {
+        this.logger.warn(`Invalid FCM token for user ${targetUserId}, should be removed`);
+      } else {
+        this.logger.error(`Failed to send chat message notification to ${targetUserId}:`, error);
+      }
+    }
   }
 
   async sendLikeNotification(

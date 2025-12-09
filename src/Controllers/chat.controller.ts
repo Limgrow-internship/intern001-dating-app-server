@@ -25,6 +25,7 @@ export class ChatController {
       imgChat: string;
       audioPath?: string;
       duration?: number;
+      clientMessageId?: string;
     },
   ) {
     const msg = await this.chatService.sendMessage(messageDto);
@@ -32,6 +33,7 @@ export class ChatController {
       ...msg,
       matchId: messageDto.matchId,
       senderId: messageDto.senderId,
+      clientMessageId: messageDto.clientMessageId,
     });
     return msg;
   }
