@@ -15,6 +15,9 @@ export class Message {
   message: string;
 
   @Prop()
+  clientMessageId?: string;
+
+  @Prop()
   audioPath?: string;     
 
   @Prop()

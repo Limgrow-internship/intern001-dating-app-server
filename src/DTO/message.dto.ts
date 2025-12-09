@@ -7,4 +7,5 @@ export interface MessageDTO {
     duration?: number;
     timestamp?: Date;
     delivered?: boolean;
+    clientMessageId?: string;
   }

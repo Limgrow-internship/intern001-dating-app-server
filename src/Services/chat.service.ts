@@ -60,6 +60,7 @@ export class ChatService {
       matchId: messageDto.matchId,
       senderId: messageDto.senderId,
       message: encryptedMessage,
+      clientMessageId: (messageDto as any).clientMessageId,
       imgChat: messageDto.imgChat,
       audioPath: messageDto.audioPath,
       duration: messageDto.duration,
@@ -71,6 +72,7 @@ export class ChatService {
     return {
       ...saved.toObject(),
       message: messageDto.message ?? '',
+      clientMessageId: (messageDto as any).clientMessageId,
       imgChat: messageDto.imgChat,
       audioPath: messageDto.audioPath,
       duration: messageDto.duration,
