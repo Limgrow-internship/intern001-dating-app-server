@@ -11,6 +11,8 @@ import { ChatService } from 'src/Services/chat.service';
 import { CloudinaryService } from 'src/Services/cloudinary.service';
 import { AIModule } from './ai.module';
 import { Match, MatchSchema } from 'src/Models/match.model';
+import { User, UserSchema } from 'src/Models/user.model';
+import { FcmService } from 'src/Services/fcm.service';
 
 
 @Module({
@@ -20,11 +22,12 @@ import { Match, MatchSchema } from 'src/Models/match.model';
       { name: Conversation.name, schema: ConversationSchema },
       { name: Profile.name, schema: ProfileSchema },
       { name: Match.name, schema: MatchSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     AIModule,
   ],
   controllers: [ChatController, UploadAudioController, MediaController],
-  providers: [ChatService, CloudinaryService, ChatGateway],
+  providers: [ChatService, CloudinaryService, ChatGateway, FcmService],
   exports: [ChatService, CloudinaryService, ChatGateway],
 })
 export class ChatModule {}

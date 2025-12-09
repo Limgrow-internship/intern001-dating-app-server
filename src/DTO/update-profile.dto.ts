@@ -71,6 +71,31 @@ export class UpdateProfileDto {
     @IsOptional()
     location?: string | { longitude: number; latitude: number };
 
+    @ApiPropertyOptional({ description: 'Longitude (helper field if location not provided)', example: 106.660172 })
+    @IsOptional()
+    @Transform(({ value }) => (value === undefined || value === null || value === '' ? undefined : Number(value)))
+    @IsNumber()
+    longitude?: number;
+
+    @ApiPropertyOptional({ description: 'Latitude (helper field if location not provided)', example: 10.762622 })
+    @IsOptional()
+    @Transform(({ value }) => (value === undefined || value === null || value === '' ? undefined : Number(value)))
+    @IsNumber()
+    latitude?: number;
+
+    // Aliases for mobile clients that send lng/lat
+    @ApiPropertyOptional({ description: 'Alias of longitude', example: 106.660172 })
+    @IsOptional()
+    @Transform(({ value }) => (value === undefined || value === null || value === '' ? undefined : Number(value)))
+    @IsNumber()
+    lng?: number;
+
+    @ApiPropertyOptional({ description: 'Alias of latitude', example: 10.762622 })
+    @IsOptional()
+    @Transform(({ value }) => (value === undefined || value === null || value === '' ? undefined : Number(value)))
+    @IsNumber()
+    lat?: number;
+
     @ApiPropertyOptional({ description: 'Age of the user (18-100)', minimum: 18, maximum: 100 })
     @IsOptional()
     @IsNumber()

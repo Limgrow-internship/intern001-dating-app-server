@@ -14,6 +14,8 @@ import { AIRouterService } from 'src/Services/ai-router.service';
 import { AI_ASSISTANT_USER_ID } from 'src/common/constants';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { User } from 'src/Models/user.model';
+import { FcmService } from 'src/Services/fcm.service';
 
 @WebSocketGateway({
   cors: {
@@ -34,6 +36,9 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     private readonly aiRouter: AIRouterService,
     @InjectModel('Profile')
     private readonly profileModel: Model<any>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<any>,
+    private readonly fcmService: FcmService,
   ) {}
 
   afterInit(server: Server) {
@@ -69,6 +74,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       audioPath?: string;
       duration?: number;
       imgChat?: string;
+      clientMessageId?: string;
     },
     @ConnectedSocket() client: Socket,
   ) {
@@ -88,6 +94,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       timestamp: new Date(),
       matchId: data.matchId,
       delivered,
+      clientMessageId: data.clientMessageId,
     };
 
     try {
@@ -96,14 +103,26 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
       if (match && match.status === 'blocked') {
         if (match.blockerId !== data.senderId) {
-          client.emit('receive_message', msgObj); // chỉ gửi về cho sender
+          client.emit('receive_message', result); // chỉ gửi về cho sender
           return;
         }
       
         return;
       }
 
-      this.server.to(data.matchId).emit('receive_message', msgObj);
+      this.server.to(data.matchId).emit('receive_message', result);
+
+      // Send push notification to the other user (if delivered)
+      const recipientId =
+        match?.userId === data.senderId ? match?.targetUserId : match?.userId;
+      if (
+        result.delivered !== false &&
+        recipientId &&
+        recipientId !== data.senderId &&
+        data.senderId !== AI_ASSISTANT_USER_ID
+      ) {
+        this.sendNewMessageNotification(recipientId, data.senderId, data.matchId, data.message);
+      }
 
       const isAI = await this.chatService.isAIConversation(data.matchId);
       if (isAI && data.message && data.senderId !== AI_ASSISTANT_USER_ID) {
@@ -115,6 +134,45 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       }
     } catch (error) {
       console.error('Error in send_message:', error.message);
+    }
+  }
+
+  /**
+   * Send push notification for a new message
+   */
+  private async sendNewMessageNotification(
+    targetUserId: string,
+    senderId: string,
+    matchId: string,
+    message?: string,
+  ) {
+    try {
+      const targetUser = await this.userModel.findOne({ id: targetUserId }).select('fcmToken');
+      if (!targetUser?.fcmToken) return;
+
+      const senderProfile = await this.profileModel
+        .findOne({ userId: senderId })
+        .select('firstName lastName');
+
+      const senderName =
+        senderProfile?.firstName ||
+        senderProfile?.lastName ||
+        'Người dùng';
+
+      const preview =
+        (message && message.trim()) ||
+        '[Media]';
+
+      await this.fcmService.sendChatMessageNotification({
+        targetUserId,
+        targetFcmToken: targetUser.fcmToken,
+        senderId,
+        senderName,
+        matchId,
+        messagePreview: preview,
+      });
+    } catch (error) {
+      console.error('Failed to send message notification:', (error as any)?.message || error);
     }
   }
 
@@ -171,8 +229,8 @@ Bạn đang chat với ${userName} trên một ứng dụng dating. Hãy trò ch
         matchId: matchId,
       };
 
-      await this.chatService.sendMessage(aiMsgObj);
-      this.server.to(matchId).emit('receive_message', aiMsgObj);
+      const savedAi = await this.chatService.sendMessage(aiMsgObj);
+      this.server.to(matchId).emit('receive_message', savedAi);
     } catch (error) {
       console.error('Failed to generate AI response:', error.message);
       throw error;
