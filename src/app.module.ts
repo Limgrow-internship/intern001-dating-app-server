@@ -12,6 +12,7 @@ import { PhotoModule } from './modules/photo.module';
 import { ConversationModule } from './modules/conversation.module';
 import { ChatModule } from './modules/chat.module';
 import { BlockModule } from './modules/block.module';
+import { ReportModule } from './modules/report.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { BlockModule } from './modules/block.module';
     RecommendationModule,
     AIModule,
     ConversationModule,
+    ReportModule,
   ],
 })
 export class AppModule { }
