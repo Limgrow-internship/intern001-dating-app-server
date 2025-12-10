@@ -12,6 +12,7 @@ import axios from 'axios';
 import { CloudinaryService } from '../Services/cloudinary.service';
 import { PhotoService } from '../Services/photo.service';
 import { PhotoType, PhotoSource } from '../Models/photo.model';
+import * as admin from 'firebase-admin';
 
 @Injectable()
 export class AuthService {
@@ -95,19 +96,15 @@ export class AuthService {
   }
 
   async googleLogin(idToken: string) {
-    let payload;
+    let payload: admin.auth.DecodedIdToken;
     try {
-      const ticket = await this.googleClient.verifyIdToken({
-        idToken,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
-      payload = ticket.getPayload();
-      if (!payload) throw new UnauthorizedException('Invalid Google token');
+      payload = await admin.auth().verifyIdToken(idToken);
     } catch (err) {
       throw new UnauthorizedException('Invalid Google token');
     }
 
-    const googleId = payload.sub;
+
+    const googleId = payload.uid;
     const email = payload.email;
     const name = payload.name || '';
     const picture = payload.picture || null;
@@ -347,4 +344,32 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
   }
+
+
+  // async loginWithGoogle(idToken: string) {
+  //   try {
+  //     const decodedToken = await admin.auth().verifyIdToken(idToken);
+
+  //     const uid = decodedToken.uid;
+  //     const email = decodedToken.email;
+  //     const name = decodedToken.name || '';
+  //     const picture = decodedToken.picture || '';
+
+  //     // TODO: check DB user or create new one
+  //     // here return fake example:
+
+  //     const payload = { uid, email };
+  //     const accessToken = this.jwtService.sign(payload);
+
+  //     return {
+  //       accessToken,
+  //       email,
+  //       name,
+  //       picture,
+  //     };
+
+  //   } catch (err) {
+  //     throw new UnauthorizedException('Invalid Google Token');
+  //   }
+  // }
 }
