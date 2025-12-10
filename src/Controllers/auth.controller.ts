@@ -45,9 +45,11 @@ export class AuthController {
     schema: { example: { accessToken: '...', refreshToken: '...' } }
   })
   @ApiResponse({ status: 401, description: 'Invalid Google token' })
-  googleLogin(@Body() body: LoginWithGoogleDto) {
-    return this.auth.googleLogin(body.accessToken);
+  @Post('google-login')
+  googleLogin(@Body('idToken') idToken: string) {
+    return this.auth.googleLogin(idToken);
   }
+
 
   @Post('refresh')
   @HttpCode(200)
