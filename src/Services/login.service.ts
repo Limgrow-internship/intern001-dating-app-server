@@ -344,32 +344,4 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
   }
-
-
-  // async loginWithGoogle(idToken: string) {
-  //   try {
-  //     const decodedToken = await admin.auth().verifyIdToken(idToken);
-
-  //     const uid = decodedToken.uid;
-  //     const email = decodedToken.email;
-  //     const name = decodedToken.name || '';
-  //     const picture = decodedToken.picture || '';
-
-  //     // TODO: check DB user or create new one
-  //     // here return fake example:
-
-  //     const payload = { uid, email };
-  //     const accessToken = this.jwtService.sign(payload);
-
-  //     return {
-  //       accessToken,
-  //       email,
-  //       name,
-  //       picture,
-  //     };
-
-  //   } catch (err) {
-  //     throw new UnauthorizedException('Invalid Google Token');
-  //   }
-  // }
 }
