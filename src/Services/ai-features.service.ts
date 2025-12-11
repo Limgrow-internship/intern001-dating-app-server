@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { AIRouterService } from './ai-router.service';
@@ -8,6 +8,8 @@ import { PhotoService } from './photo.service';
 
 @Injectable()
 export class AIFeaturesService {
+  private readonly logger = new Logger(AIFeaturesService.name);
+
   constructor(
     private aiRouter: AIRouterService,
     @InjectModel(Profile.name) private profileModel: Model<ProfileDocument>,
@@ -185,31 +187,43 @@ Explanation:`;
       throw new Error('No bio to enhance');
     }
   
-    const prompt = `Rewrite this dating profile bio to be SHORT, CONCISE, and HIGHLY ENGAGING while keeping the same information and personality.
-  
-  Original bio: "${profile.bio}"
-  
-  Interests: ${profile.interests?.join(', ') || 'Not specified'}
-  
-  Guidelines:
-  - Write SHORT and CONCISE (1-3 sentences, 50-100 words maximum)
-  - Start with a hook that grabs attention immediately
-  - Be punchy, witty, and memorable
-  - Show personality in few words
-  - Use active voice and strong verbs
-  - Keep it authentic and natural
-  - Don't add fake information
-  - Write in first person
-  - Make every word count - remove filler words
-  
-  Enhanced bio:`;
+    this.logger.log(
+      `EnhanceBio request user=${userId}, bio="${(profile.bio || '').slice(
+        0,
+        200,
+      )}"`,
+    );
+
+    const prompt = `Bạn là chuyên gia viết hồ sơ hẹn hò. Hãy viết lại đoạn bio dưới đây thành phiên bản mới, súc tích và lôi cuốn hơn. Giữ nguyên thông tin và cá tính, dùng đúng ngôn ngữ của bio gốc (nếu bio gốc là tiếng Việt, hãy viết tiếng Việt).
+
+Bio gốc:
+"""${profile.bio}"""
+
+Sở thích: ${profile.interests?.join(', ') || 'Không nêu'}
+
+Yêu cầu:
+- Viết 1-2 câu (40-80 từ), mở đầu bắt tai và tích cực
+- Diễn đạt KHÁC so với bio gốc (đổi cấu trúc câu, dùng từ mới, tránh lặp lại câu/ý cũ)
+- Giọng tự nhiên, chân thật, ngôi thứ nhất
+- Có thể lồng 1-2 sở thích nếu phù hợp
+- Không bịa thêm thông tin
+- Không trả về tiêu đề, nhãn, hay dấu ngoặc kép
+
+Bio đã viết lại:`;
   
     const response = await this.aiRouter.generate({
       prompt,
-      temperature: 0.8,
-      maxTokens: 120,
+      temperature: 0.9,
+      maxTokens: 140,
     });
   
+    this.logger.log(
+      `EnhanceBio response user=${userId}, provider=${response.provider}, raw="${response.text?.slice(
+        0,
+        200,
+      )}"`,
+    );
+
     return {
       originalBio: profile.bio,
       enhancedBio: response.text.trim().replace(/^["']|["']$/g, ''),
@@ -229,33 +243,34 @@ Explanation:`;
       throw new Error('Profile not found');
     }
   
-    const prompt = `Generate a SHORT, CONCISE, and HIGHLY ENGAGING dating profile bio based on the user's ideas and information.
-  
-  User's ideas/prompt: "${userPrompt}"
-  
-  User information:
-  - Name: ${profile.firstName || 'User'} ${profile.lastName || ''}
-  - Age: ${profile.age || 'Not specified'}
-  - Gender: ${profile.gender || 'Not specified'}
-  - Interests: ${profile.interests?.join(', ') || 'Not specified'}
-  
-  Guidelines:
-  - Write SHORT and CONCISE (1-3 sentences, 50-100 words maximum)
-  - Start with a hook that grabs attention immediately
-  - Be punchy, witty, and memorable
-  - Show personality in few words
-  - Use active voice and strong verbs
-  - Use the information from the user's prompt
-  - Make it attractive but not overly promotional
-  - Don't add information that wasn't in the user's prompt
-  - Write in first person
-  - Make every word count - remove filler words
-  
-  Generated bio:`;
+    const prompt = `You are a dating-profile copywriter. Create a SHORT, CONCISE, and HIGHLY ENGAGING bio that matches the language of the user's ideas. Detect the language from the user's prompt: reply in that language. If the language is unclear, default to Vietnamese. Use only one language consistently.
+
+User's ideas/prompt: "${userPrompt}"
+
+User information:
+- Name: ${profile.firstName || 'User'} ${profile.lastName || ''}
+- Age: ${profile.age || 'Not specified'}
+- Gender: ${profile.gender || 'Not specified'}
+- Interests: ${profile.interests?.join(', ') || 'Not specified'}
+
+Guidelines:
+- 1-2 sentences, 30-70 words
+- Start with a hook that grabs attention immediately
+- Be punchy, witty, and memorable
+- Show personality in few words
+- Use active voice and strong verbs
+- Use the information from the user's prompt
+- Make it attractive but not overly promotional
+- Do not add information that wasn't in the user's prompt
+- Write in first person
+- Keep a single language; do not mix languages
+- Make every word count - remove filler words
+
+Generated bio:`;
   
     const response = await this.aiRouter.generate({
       prompt,
-      temperature: 0.8,
+      temperature: 0.85,
       maxTokens: 150,
     });
   
