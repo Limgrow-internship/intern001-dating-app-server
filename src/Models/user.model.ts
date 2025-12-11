@@ -22,9 +22,9 @@ export class User {
     googleId?: string;
 
     @Prop({
-    required: function (this: any) {
-        return !this.googleId && !this.facebookId;
-    }
+        required: function (this: any) {
+            return !this.googleId && !this.facebookId;
+        }
     })
     password?: string;
 

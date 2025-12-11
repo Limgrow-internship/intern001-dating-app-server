@@ -96,4 +96,19 @@ export class UsersController {
     async getFcmToken(@Request() req) {
         return this.userService.getFcmToken(req.user.userId);
     }
+
+    @Post('forgot-password/request-otp')
+    requestResetOtp(@Body('email') email: string) {
+        return this.userService.requestResetOtp(email);
+    }
+
+    @Put('forgot-password/reset')
+    resetPasswordWithOtp(@Body() body: any) {
+        return this.userService.resetPasswordWithOtp(
+            body.email,
+            body.otp,
+            body.newPassword,
+            body.confirmPassword
+        );
+    }
 }
