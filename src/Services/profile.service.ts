@@ -11,6 +11,7 @@ import { Conversation, ConversationDocument } from '../Models/conversation.model
 import { BlockedUser, BlockedUserDocument } from '../Models/blocked-user.model';
 import { DailyLimit, DailyLimitDocument } from '../Models/daily-limit.model';
 import { Preference, PreferenceDocument } from '../Models/preference.model';
+import { User, UserDocument } from '../Models/user.model';
 import { ResponseTransformer } from '../Utils/response-transformer';
 import { MatchCardResponseDto } from '../DTO/match-card-response.dto';
 import { OPEN_QUESTIONS } from "../constant/open-questions.constant";
@@ -33,6 +34,8 @@ export class ProfileService {
         private dailyLimitModel: Model<DailyLimitDocument>,
         @InjectModel(Preference.name)
         private preferenceModel: Model<PreferenceDocument>,
+        @InjectModel(User.name)
+        private userModel: Model<UserDocument>,
         private photoService: PhotoService,
     ) { }
 
@@ -319,6 +322,9 @@ export class ProfileService {
 
             // Delete preferences
             this.preferenceModel.deleteMany({ userId }),
+
+            // Delete user account record (email, tokens, etc.)
+            this.userModel?.deleteOne({ id: userId }).catch(() => undefined),
         ];
 
         // Execute all delete operations

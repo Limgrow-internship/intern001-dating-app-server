@@ -8,6 +8,7 @@ import { Conversation, ConversationSchema } from '../Models/conversation.model';
 import { BlockedUser, BlockedUserSchema } from '../Models/blocked-user.model';
 import { DailyLimit, DailyLimitSchema } from '../Models/daily-limit.model';
 import { Preference, PreferenceSchema } from '../Models/preference.model';
+import { User, UserSchema } from '../Models/user.model';
 import { ProfileService } from '../Services/profile.service';
 import { ProfileController } from '../Controllers/profile.controller';
 import { JwtAuthGuard } from '../Guards/jwt-auth.guard';
@@ -25,6 +26,7 @@ import { PhotoModule } from './photo.module';
       { name: BlockedUser.name, schema: BlockedUserSchema },
       { name: DailyLimit.name, schema: DailyLimitSchema },
       { name: Preference.name, schema: PreferenceSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET,

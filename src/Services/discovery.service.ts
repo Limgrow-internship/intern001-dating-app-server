@@ -76,19 +76,19 @@ export class DiscoveryService {
     // Get recommendations from existing service (it handles filtering)
     const recommendations = await this.recommendationService.getRecommendations(userId, 1);
 
-    if (recommendations.length === 0) {
+    // Remove self, blocked, swiped
+    const filtered = recommendations.filter(
+      (rec) =>
+        rec.profile.userId !== userId &&
+        !blockedUserIds.includes(rec.profile.userId) &&
+        !swipedUserIds.includes(rec.profile.userId),
+    );
+
+    if (filtered.length === 0) {
       return null; // No more candidates
     }
 
-    const topCandidate = recommendations[0].profile;
-
-    // Double-check the candidate is not blocked or swiped
-    if (
-      blockedUserIds.includes(topCandidate.userId) ||
-      swipedUserIds.includes(topCandidate.userId)
-    ) {
-      return null;
-    }
+    const topCandidate = filtered[0].profile;
 
     // Fetch photos for candidate
     const candidatePhotos = await this.photoService.getUserPhotos(topCandidate.userId);
@@ -138,6 +138,7 @@ export class DiscoveryService {
     const filteredRecs = recommendations
       .filter(
         (rec) =>
+          rec.profile.userId !== userId && // avoid self
           !blockedUserIds.includes(rec.profile.userId) &&
           !swipedUserIds.includes(rec.profile.userId),
       )
