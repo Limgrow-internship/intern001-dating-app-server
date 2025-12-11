@@ -32,6 +32,9 @@ export class Message {
   @Prop({ default: true })
   delivered: boolean;
 
+  @Prop({ type: [String], default: [] })
+  deletedFor: string[];
+
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
