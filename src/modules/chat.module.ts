@@ -13,6 +13,7 @@ import { AIModule } from './ai.module';
 import { Match, MatchSchema } from 'src/Models/match.model';
 import { User, UserSchema } from 'src/Models/user.model';
 import { FcmService } from 'src/Services/fcm.service';
+import { JwtModule } from '@nestjs/jwt';
 
 
 @Module({
@@ -25,6 +26,10 @@ import { FcmService } from 'src/Services/fcm.service';
       { name: User.name, schema: UserSchema },
     ]),
     AIModule,
+    JwtModule.register({
+      secret: process.env.JWT_ACCESS_SECRET,
+      signOptions: { expiresIn: '1d' },
+    }),
   ],
   controllers: [ChatController, UploadAudioController, MediaController],
   providers: [ChatService, CloudinaryService, ChatGateway, FcmService],

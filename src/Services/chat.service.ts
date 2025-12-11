@@ -24,9 +24,9 @@ export class ChatService {
     return this.matchModel.findById(matchId);
   }
 
-  async getLastMessageBymatchId(matchId: string) {
+  async getLastMessageBymatchId(matchId: string, userId: string) {
     const lastMsg = await this.messageModel
-      .findOne({ matchId, delivered: true })
+      .findOne({ matchId, delivered: true , deletedFor: { $ne: userId },})
       .sort({ timestamp: -1 })
       .lean();
     if (!lastMsg) return null;
@@ -79,21 +79,57 @@ export class ChatService {
     };
   }
 
+  // async getMessages(matchId: string, forUserId?: string) {
+  //   const match = isValidObjectId(matchId)
+  //     ? await this.matchModel.findById(matchId).lean()
+  //     : null;
+  //   const docs = await this.messageModel.find({ matchId }).exec();
+  
+  //   let messages = docs;
+  
+  //   if (match && match.status === 'blocked' && match.blockerId === forUserId) {
+  //     messages = docs.filter(msg =>
+  //       msg.delivered !== false || msg.senderId === forUserId
+  //     );
+  //   }
+  
+  //   return messages.map((msg) => {
+  //     try {
+  //       if (!msg.message) return { ...msg.toObject(), message: '' };
+  //       const decrypted = decryptMessage(msg.message);
+  //       return {
+  //         ...msg.toObject(),
+  //         message: decrypted || msg.message,
+  //       };
+  //     } catch (e) {
+  //       console.error('Decrypt fail message: [encrypted]', e.message);
+  //       return {
+  //         ...msg.toObject(),
+  //         message: '[Decrypt error]',
+  //       };
+  //     }
+  //   });
+  // }
+
   async getMessages(matchId: string, forUserId?: string) {
+    const filter: any = { matchId };
+    if (forUserId) {
+      filter.deletedFor = { $ne: forUserId };
+    }
     const match = isValidObjectId(matchId)
       ? await this.matchModel.findById(matchId).lean()
       : null;
-    const docs = await this.messageModel.find({ matchId }).exec();
   
-    let messages = docs;
+    let docs = await this.messageModel.find(filter).exec();
+  
   
     if (match && match.status === 'blocked' && match.blockerId === forUserId) {
-      messages = docs.filter(msg =>
+      docs = docs.filter(msg =>
         msg.delivered !== false || msg.senderId === forUserId
       );
     }
   
-    return messages.map((msg) => {
+    return docs.map((msg) => {
       try {
         if (!msg.message) return { ...msg.toObject(), message: '' };
         const decrypted = decryptMessage(msg.message);
@@ -109,6 +145,14 @@ export class ChatService {
         };
       }
     });
+  }
+
+  async clearMessagesForUser(matchId: string, userId: string) {
+    await this.messageModel.updateMany(
+      { matchId, deletedFor: { $ne: userId } },
+      { $addToSet: { deletedFor: userId } }
+    );
+    return { success: true };
   }
 
   async isAIConversation(matchId: string): Promise<boolean> {

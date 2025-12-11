@@ -21,8 +21,11 @@ export class FcmService implements OnModuleInit {
 
   private initializeFirebase() {
     try {
+      this.logger.log('Initializing Firebase Admin SDK...');
+
       // Check if already initialized
       if (admin.apps.length > 0) {
+        this.logger.log('Firebase already initialized, reusing existing app');
         this.initialized = true;
         return;
       }
@@ -30,6 +33,9 @@ export class FcmService implements OnModuleInit {
       // Option 1: Using service account JSON (recommended for production)
       if (process.env.FIREBASE_SERVICE_ACCOUNT) {
         const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        this.logger.log(
+          `Firebase service account from FIREBASE_SERVICE_ACCOUNT env (project=${serviceAccount.project_id}, email=${serviceAccount.client_email}, key_id=${serviceAccount.private_key_id ?? 'n/a'})`,
+        );
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
         });
@@ -39,7 +45,13 @@ export class FcmService implements OnModuleInit {
 
       // Option 2: Using service account file path
       if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+        this.logger.log(
+          `Firebase service account from path ${process.env.FIREBASE_SERVICE_ACCOUNT_PATH}`,
+        );
         const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+        this.logger.log(
+          `Loaded service account (project=${serviceAccount.project_id}, email=${serviceAccount.client_email}, key_id=${serviceAccount.private_key_id ?? 'n/a'})`,
+        );
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
         });
@@ -49,6 +61,7 @@ export class FcmService implements OnModuleInit {
 
       // Option 3: Using default credentials (for Google Cloud environments)
       try {
+        this.logger.log('Trying default application credentials for Firebase');
         admin.initializeApp();
         this.initialized = true;
       } catch (error) {
@@ -375,7 +388,7 @@ export class FcmService implements OnModuleInit {
           ...(matchedUserPhotoUrl && { matchedUserPhotoUrl: matchedUserPhotoUrl }),
         },
         notification: {
-          title: "It's a Match! 💕",
+          title: "It's a Match!",
           body: `You and ${matchedUserName} liked each other — now it's time to say hi. Start your first chat!`,
         },
         android: {
