@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Body, Param, Inject, forwardRef } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Inject, forwardRef, Delete, Req, UseGuards } from '@nestjs/common';
 import { ChatGateway } from 'src/gateways/chat.gateway';
+import { JwtAuthGuard } from 'src/Guards/jwt-auth.guard';
 import { ChatService } from 'src/Services/chat.service';
 
+@UseGuards(JwtAuthGuard)
 @Controller('chat')
 export class ChatController {
   constructor(
@@ -11,9 +13,10 @@ export class ChatController {
   ) {}
 
   @Get('history/:matchId')
-  async getHistory(@Param('matchId') matchId: string) {
-    return await this.chatService.getMessages(matchId);
-  }
+async getHistory(@Param('matchId') matchId: string, @Req() req) {
+  const userId = req.user?.userId;
+  return await this.chatService.getMessages(matchId, userId);
+}
 
   @Post('send')
   async sendMessage(
@@ -39,7 +42,14 @@ export class ChatController {
   }
 
   @Get('rooms/:matchId/last-message')
-  async getLastMessage(@Param('matchId') matchId: string) {
-    return this.chatService.getLastMessageBymatchId(matchId);
+async getLastMessage(@Param('matchId') matchId: string, @Req() req) {
+  const userId = req.user?.userId;
+  return await this.chatService.getLastMessageBymatchId(matchId, userId);
+}
+
+  @Delete(':matchId/clear')
+  async clearMessages(@Param('matchId') matchId: string, @Req() req) {
+    const userId = req.user.userId;
+    return this.chatService.clearMessagesForUser(matchId, userId);
   }
 }
