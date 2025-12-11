@@ -5,6 +5,12 @@ import { Match, MatchDocument } from 'src/Models/match.model';
 import { AI_ASSISTANT_USER_ID, AI_ASSISTANT_NAME } from 'src/common/constants';
 import { ClientSession } from 'mongoose';
 
+interface MessageLean {
+  message?: string;
+  timestamp?: string;
+  [key: string]: any;
+}
+
 type MatchedUserResult = {
   matchId: any;
   lastActivityAt: any;
@@ -16,6 +22,9 @@ type MatchedUserResult = {
     age: number | null;
     city: number | '';
   };
+  status: string;
+  lastMessage?: string;
+  lastMessageAt?: string;
 };
 
 @Injectable()
@@ -41,11 +50,7 @@ export class ConversationService {
     return age;
   }
 
-  /**
-   * Ensure AI conversation exists for user, create if not
-   */
   private async ensureAIConversation(userId: string): Promise<string | null> {
-    // Check if AI conversation already exists
     const existingAIConversation = await this.conversationModel.findOne({
       $or: [
         { userId1: userId, userId2: AI_ASSISTANT_USER_ID },
@@ -57,17 +62,14 @@ export class ConversationService {
       return existingAIConversation.matchId;
     }
 
-    // Create AI match and conversation
     const session: ClientSession = await this.matchModel.db.startSession();
     session.startTransaction();
 
     try {
-      // Create match with AI
       const [userId1, userId2] = userId < AI_ASSISTANT_USER_ID 
         ? [userId, AI_ASSISTANT_USER_ID] 
         : [AI_ASSISTANT_USER_ID, userId];
 
-      // Check if match already exists
       const existingMatch = await this.matchModel
         .findOne({
           userId: userId1,
@@ -90,7 +92,6 @@ export class ConversationService {
         matchId = (match as any)._id.toString();
       }
 
-      // Create conversation
       const conversationData = {
         matchId: matchId,
         userId1: userId,
@@ -113,7 +114,6 @@ export class ConversationService {
   }
 
   async listMatchedUsers(currentUserId: string): Promise<MatchedUserResult[]> {
-    // Ensure AI conversation exists
     await this.ensureAIConversation(currentUserId);
 
     const activeMatches = await this.matchModel.find({
@@ -133,10 +133,10 @@ export class ConversationService {
       $or: [
         { userId1: currentUserId },
         { userId2: currentUserId }
-      ]
+      ],
+      deletedBy: { $ne: currentUserId }
     }).lean();
   
-    // Separate AI conversation from regular conversations
     const aiConversation = conversations.find(conv => 
       conv.userId1 === AI_ASSISTANT_USER_ID || conv.userId2 === AI_ASSISTANT_USER_ID
     );
@@ -158,8 +158,16 @@ export class ConversationService {
   
     const results: MatchedUserResult[] = [];
     
-    // Add AI conversation first
     if (aiConversation) {
+      const lastMsg = await this.messageModel
+        .findOne({
+          matchId: aiConversation.matchId,
+          delivered: true,
+          deletedFor: { $ne: currentUserId },
+        })
+        .sort({ timestamp: -1 })
+        .lean<MessageLean>();
+
       results.push({
         matchId: aiConversation.matchId,
         lastActivityAt: aiConversation.lastActivityAt,
@@ -171,20 +179,30 @@ export class ConversationService {
           age: null,
           city: '',
         },
-        status: 'active'
+        status: 'active',
+        lastMessage: lastMsg && lastMsg.message ? lastMsg.message : (lastMsg ? '[Media]' : ''),
+        lastMessageAt: lastMsg && lastMsg.timestamp ? lastMsg.timestamp : null,
       } as any);
     }
     
-    // Add regular conversations
     for (const conv of regularConversations) {
       const otherUserId = conv.userId1 === currentUserId ? conv.userId2 : conv.userId1;
       const profile = profiles.find(p => p.userId === otherUserId);
-  
+
       let photo = primaryPhotos.find(ph => ph.userId === otherUserId);
       if (!photo) {
         photo = await this.photoModel.findOne({ userId: otherUserId, isActive: true }).sort({ createdAt: 1 }).lean() as any;
       }
-  
+
+      const lastMsg = await this.messageModel
+        .findOne({
+          matchId: conv.matchId,
+          delivered: true,
+          deletedFor: { $ne: currentUserId },
+        })
+        .sort({ timestamp: -1 })
+        .lean<MessageLean>();
+
       results.push({
         matchId: conv.matchId,
         lastActivityAt: conv.lastActivityAt,
@@ -196,7 +214,9 @@ export class ConversationService {
           age: this.getAge(profile?.dateOfBirth || null),
           city: profile?.city || '',
         },
-        status: matchIdToStatus.get(conv.matchId?.toString()) || 'active'
+        status: matchIdToStatus.get(conv.matchId?.toString()) || 'active',
+        lastMessage: lastMsg && lastMsg.message ? lastMsg.message : (lastMsg ? '[Media]' : ''),
+        lastMessageAt: lastMsg && lastMsg.timestamp ? lastMsg.timestamp : null,
       } as any);
     }
   
@@ -206,7 +226,7 @@ export class ConversationService {
   async deleteForUser(matchId: string, userId: string) {
     const conversation = await this.conversationModel.findOneAndUpdate(
       { matchId },
-      { $addToSet: { deletedBy: userId } },
+      { $addToSet: { deletedBy: userId,  } },
       { new: true }
     );
 
