@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, isValidObjectId } from 'mongoose';
 import { encryptMessage, decryptMessage } from '../common/encryption.util';
@@ -17,6 +17,8 @@ export class ChatService {
     private readonly conversationModel: Model<any>,
     @InjectModel(Match.name)
     private readonly matchModel: Model<MatchDocument>,
+    @InjectModel('Profile')
+    private readonly profileModel: Model<any>,
   ) {}
 
   async getMatchById(matchId: string): Promise<MatchDocument | null> {
@@ -30,10 +32,14 @@ export class ChatService {
       .sort({ timestamp: -1 })
       .lean();
     if (!lastMsg) return null;
-    return {
-      ...lastMsg,
-      message: decryptMessage(lastMsg.message),
-    };
+
+    try {
+      const decrypted = lastMsg.message ? decryptMessage(lastMsg.message) : '';
+      return this.mapMessage(lastMsg, decrypted);
+    } catch (e) {
+      console.error('Decrypt fail last message: [encrypted]', (e as any)?.message || e);
+      return this.mapMessage(lastMsg, '[Decrypt error]');
+    }
   }
 
   async sendMessage(messageDto: MessageDTO) {
@@ -48,6 +54,16 @@ export class ChatService {
       ? encryptMessage(messageDto.message)
       : '';
 
+    const replyToTimestamp = messageDto.replyToTimestamp
+      ? new Date(messageDto.replyToTimestamp as any)
+      : undefined;
+
+    const replyMeta = await this.buildReplyMeta(
+      (messageDto as any).replyToMessageId,
+      (messageDto as any).replyPreview,
+      (messageDto as any).replySenderName,
+    );
+
     let delivered = true;
     if (match && match.status === 'blocked' && match.blockerId !== senderId) {
       delivered = false;
@@ -61,6 +77,13 @@ export class ChatService {
       senderId: messageDto.senderId,
       message: encryptedMessage,
       clientMessageId: (messageDto as any).clientMessageId,
+      replyToMessageId: (messageDto as any).replyToMessageId,
+      replyToClientMessageId: (messageDto as any).replyToClientMessageId,
+      replyToTimestamp,
+      replyPreview: replyMeta?.replyPreview,
+      replySenderId: replyMeta?.replySenderId,
+      replySenderName: replyMeta?.replySenderName,
+      reaction: messageDto.reaction,
       imgChat: messageDto.imgChat,
       audioPath: messageDto.audioPath,
       duration: messageDto.duration,
@@ -68,15 +91,7 @@ export class ChatService {
       delivered: delivered,
     });
 
-
-    return {
-      ...saved.toObject(),
-      message: messageDto.message ?? '',
-      clientMessageId: (messageDto as any).clientMessageId,
-      imgChat: messageDto.imgChat,
-      audioPath: messageDto.audioPath,
-      duration: messageDto.duration,
-    };
+    return this.mapMessage(saved, messageDto.message ?? '');
   }
 
   // async getMessages(matchId: string, forUserId?: string) {
@@ -131,18 +146,12 @@ export class ChatService {
   
     return docs.map((msg) => {
       try {
-        if (!msg.message) return { ...msg.toObject(), message: '' };
+        if (!msg.message) return this.mapMessage(msg, '');
         const decrypted = decryptMessage(msg.message);
-        return {
-          ...msg.toObject(),
-          message: decrypted || msg.message,
-        };
+        return this.mapMessage(msg, decrypted || msg.message);
       } catch (e) {
         console.error('Decrypt fail message: [encrypted]', e.message);
-        return {
-          ...msg.toObject(),
-          message: '[Decrypt error]',
-        };
+        return this.mapMessage(msg, '[Decrypt error]');
       }
     });
   }
@@ -183,5 +192,85 @@ export class ChatService {
         const sender = msg.senderId === AI_ASSISTANT_USER_ID ? aiName : 'User';
         return `${sender}: ${decrypted || '[Media]'}`;
       });
+  }
+
+  async reactMessage(params: {
+    matchId: string;
+    messageId?: string;
+    clientMessageId?: string;
+    reaction?: string;
+  }) {
+    const { matchId, messageId, clientMessageId, reaction } = params;
+    if (!messageId && !clientMessageId) {
+      throw new BadRequestException('messageId or clientMessageId is required');
+    }
+
+    const filter: any = { matchId };
+    if (messageId) {
+      filter._id = messageId;
+    } else if (clientMessageId) {
+      filter.clientMessageId = clientMessageId;
+    }
+
+    const updated = await this.messageModel
+      .findOneAndUpdate(
+        filter,
+        { reaction: reaction ?? null },
+        { new: true },
+      )
+      .lean();
+
+    if (!updated) {
+      throw new NotFoundException('Message not found');
+    }
+
+    const decrypted = updated.message ? decryptMessage(updated.message) : '';
+    return this.mapMessage(updated, decrypted);
+  }
+
+  private mapMessage(msg: MessageDocument | any, messageOverride?: string) {
+    const plain = typeof msg?.toObject === 'function' ? msg.toObject() : msg;
+    const rawId = plain?._id ?? (plain as any)?.id;
+    const id = typeof rawId === 'string' ? rawId : rawId?.toString?.();
+
+    return {
+      ...plain,
+      id,
+      message: messageOverride ?? plain?.message ?? '',
+    };
+  }
+
+  private async buildReplyMeta(
+    replyToMessageId?: string,
+    replyPreviewInput?: string,
+    replySenderNameInput?: string,
+  ) {
+    if (!replyToMessageId) return null;
+
+    const replyMsg = await this.messageModel.findById(replyToMessageId).lean();
+    if (!replyMsg) return null;
+
+    const decrypted = replyMsg.message ? decryptMessage(replyMsg.message) : '';
+    const preview =
+      replyPreviewInput ||
+      decrypted ||
+      (replyMsg.imgChat ? '[Hình ảnh]' : replyMsg.audioPath ? '[Ghi âm]' : '');
+
+    let replySenderName = replySenderNameInput;
+    if (!replySenderName) {
+      const profile = await this.profileModel
+        .findOne({ userId: replyMsg.senderId })
+        .select('firstName lastName')
+        .lean() as any;
+      replySenderName =
+        (profile?.firstName || '') + (profile?.lastName ? ` ${profile.lastName}` : '');
+      replySenderName = replySenderName.trim() || undefined;
+    }
+
+    return {
+      replyPreview: preview,
+      replySenderId: replyMsg.senderId,
+      replySenderName,
+    };
   }
 }

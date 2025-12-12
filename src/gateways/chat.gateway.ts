@@ -75,9 +75,25 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       duration?: number;
       imgChat?: string;
       clientMessageId?: string;
+      // optional fields from client for reply tracking
+      replyToMessageId?: string;
+      replyToClientMessageId?: string;
+      replyToTimestamp?: string;
+      replyPreview?: string;
+      replySenderName?: string;
     },
     @ConnectedSocket() client: Socket,
   ) {
+    console.log('[chat][send_message] incoming', {
+      matchId: data.matchId,
+      senderId: data.senderId,
+      clientMessageId: data.clientMessageId,
+      replyToMessageId: (data as any).replyToMessageId,
+      replyToClientMessageId: (data as any).replyToClientMessageId,
+      replyToTimestamp: (data as any).replyToTimestamp,
+      replyPreview: (data as any).replyPreview,
+      replySenderName: (data as any).replySenderName,
+    });
     let delivered = true;
   const match = await this.chatService.getMatchById(data.matchId);
   if (match && match.status === 'blocked') {
@@ -95,10 +111,20 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       matchId: data.matchId,
       delivered,
       clientMessageId: data.clientMessageId,
+      replyToMessageId: (data as any).replyToMessageId,
+      replyToClientMessageId: (data as any).replyToClientMessageId,
+      replyToTimestamp: (data as any).replyToTimestamp,
+      replyPreview: (data as any).replyPreview,
+      replySenderName: (data as any).replySenderName,
     };
 
     try {
       const result = await this.chatService.sendMessage(msgObj);
+      console.log('[chat][send_message] saved', {
+        id: (result as any)?._id || (result as any)?.id,
+        clientMessageId: (result as any)?.clientMessageId,
+        matchId: (result as any)?.matchId,
+      });
       const match = await this.chatService.getMatchById(data.matchId);
 
       if (match && match.status === 'blocked') {
@@ -134,6 +160,52 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       }
     } catch (error) {
       console.error('Error in send_message:', error.message);
+    }
+  }
+
+  @SubscribeMessage('react_message')
+  async handleReactMessage(
+    @MessageBody()
+    data: {
+      matchId: string;
+      senderId: string;
+      messageId?: string;
+      clientMessageId?: string;
+      reaction?: string;
+    },
+    @ConnectedSocket() client: Socket,
+  ) {
+    console.log('[chat][react_message] incoming', {
+      matchId: data.matchId,
+      senderId: data.senderId,
+      messageId: data.messageId,
+      clientMessageId: data.clientMessageId,
+      reaction: data.reaction,
+    });
+
+    try {
+      const match = await this.chatService.getMatchById(data.matchId);
+      if (match && match.status === 'blocked' && match.blockerId !== data.senderId) {
+        client.emit('message_reaction', { error: 'blocked' });
+        return;
+      }
+
+      const updated = await this.chatService.reactMessage({
+        matchId: data.matchId,
+        messageId: data.messageId,
+        clientMessageId: data.clientMessageId,
+        reaction: data.reaction,
+      });
+
+      if (match && match.status === 'blocked' && match.blockerId !== data.senderId) {
+        client.emit('message_reaction', updated);
+        return;
+      }
+
+      this.server.to(data.matchId).emit('message_reaction', updated);
+    } catch (error) {
+      console.error('Error in react_message:', error?.message || error);
+      client.emit('message_reaction', { error: 'failed', detail: error?.message });
     }
   }
 
@@ -239,5 +311,9 @@ Bạn đang chat với ${userName} trên một ứng dụng dating. Hãy trò ch
 
   emitMessageToRoom(matchId: string, msg: any) {
     this.server.to(matchId).emit('receive_message', msg);
+  }
+
+  emitMessageReaction(matchId: string, msg: any) {
+    this.server.to(matchId).emit('message_reaction', msg);
   }
 }
