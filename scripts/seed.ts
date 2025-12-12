@@ -43,6 +43,23 @@ const UNIVERSITY_LIST = [
     "VinUni", "Fulbright Việt Nam", "Khác"
 ];
 
+const VIETNAMESE_LAST_NAMES = [
+    "Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Huỳnh",
+    "Phan", "Vũ", "Võ", "Đặng", "Bùi", "Đỗ",
+    "Hồ", "Ngô", "Dương", "Lý"
+];
+
+const VIETNAMESE_FIRST_NAMES_MALE = [
+    "Nam", "Huy", "Long", "Phúc", "Khang", "Duy",
+    "Hiếu", "Tài", "Đạt", "Quân", "Thắng", "Sơn"
+];
+
+const VIETNAMESE_FIRST_NAMES_FEMALE = [
+    "Lan", "Hương", "Linh", "Trang", "Mai", "Ngọc",
+    "Thảo", "Vy", "Nhi", "My", "Hà", "Yến"
+];
+
+
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
     api_key: process.env.CLOUDINARY_API_KEY!,
@@ -60,6 +77,21 @@ async function uploadRandomHuman(): Promise<UploadApiResponse> {
         folder: "dating_seed",
         upload_preset: process.env.CLOUDINARY_UPLOAD_PRESET,
     });
+}
+
+function generateVietnameseName(gender: "male" | "female") {
+    const lastName = faker.helpers.arrayElement(VIETNAMESE_LAST_NAMES);
+
+    const firstName =
+        gender === "male"
+            ? faker.helpers.arrayElement(VIETNAMESE_FIRST_NAMES_MALE)
+            : faker.helpers.arrayElement(VIETNAMESE_FIRST_NAMES_FEMALE);
+
+    return {
+        firstName,
+        lastName,
+        displayName: `${lastName} ${firstName}`,
+    };
 }
 
 async function createFakeUser() {
@@ -82,8 +114,8 @@ async function createFakeUser() {
         createdAt: new Date(),
     });
 
-    const first = faker.person.firstName();
-    const last = faker.person.lastName();
+    const gender = faker.helpers.arrayElement(["male", "female"]);
+    const { firstName, lastName, displayName } = generateVietnameseName(gender);
 
     const city = faker.helpers.arrayElement(VIETNAM_CITIES);
     const job = faker.helpers.arrayElement(JOB_LIST);
@@ -94,14 +126,13 @@ async function createFakeUser() {
 
     const profile = await ProfileModel.create({
         userId,
-        firstName: first,
-        lastName: last,
-        displayName: `${first} ${last}`,
+        firstName,
+        lastName,
+        displayName,
         bio: faker.lorem.sentence(),
         city,
         country: "Việt Nam",
-
-        gender: faker.helpers.arrayElement(["male", "female"]),
+        gender,
         education: university,
         job,
 
