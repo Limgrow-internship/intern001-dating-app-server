@@ -6,6 +6,8 @@ import * as nodemailer from 'nodemailer';
 import { EmailVerification, EmailVerificationDocument } from '../Models/email-verification.model';
 import { User, UserDocument } from '../Models/user.model';
 import { Profile, ProfileDocument } from '../Models/profile.model';
+import { JwtService } from '@nestjs/jwt';
+
 
 @Injectable()
 export class UserService {
@@ -16,6 +18,7 @@ export class UserService {
         private userModel: Model<UserDocument>,
         @InjectModel(Profile.name)
         private profileModel: Model<ProfileDocument>,
+        private readonly jwtService: JwtService,
     ) { }
 
     async requestOtp(email: string, password: string) {
@@ -273,6 +276,28 @@ export class UserService {
         return { fcmToken: user.fcmToken || null };
     }
 
+
+    private async sendOtpEmail(email: string, otp: string) {
+        if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
+            throw new InternalServerErrorException('Email config missing');
+        }
+
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.GMAIL_USER,
+                pass: process.env.GMAIL_PASS,
+            },
+        });
+
+        await transporter.sendMail({
+            from: `"OTP Verification" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Your OTP Code',
+            text: `Your OTP code is: ${otp}. It will expire in 5 minutes.`,
+        });
+    }
+
     async requestResetOtp(email: string) {
         const user = await this.userModel.findOne({ email });
         if (!user) {
@@ -280,83 +305,106 @@ export class UserService {
         }
 
         const now = new Date();
-        let record = await this.emailVerifyModel.findOne({ email });
+        const record = await this.emailVerifyModel.findOne({ email });
 
-        if (record?.lastOtpSentAt && (now.getTime() - record.lastOtpSentAt.getTime()) < 60_000) {
+        if (record?.lastOtpSentAt && now.getTime() - record.lastOtpSentAt.getTime() < 60_000) {
             const left = 60 - Math.floor((now.getTime() - record.lastOtpSentAt.getTime()) / 1000);
             throw new BadRequestException(`Please wait ${left}s before requesting new OTP.`);
         }
 
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
-
-        const expiresAt = new Date(Date.now() + 90_000);
+        const hashedOtp = await bcrypt.hash(otp, 10);
 
         await this.emailVerifyModel.findOneAndUpdate(
             { email },
             {
                 email,
-                otp,
-                otpExpiresAt: expiresAt,
+                otp: hashedOtp,
+                otpExpiresAt: new Date(Date.now() + 5 * 60_000),
                 attempts: 0,
-                lastOtpSentAt: now,
                 resendCount: (record?.resendCount ?? 0) + 1,
+                lastOtpSentAt: now,
                 isForReset: true,
             },
-            { upsert: true, new: true },
+            { upsert: true }
         );
 
-        await this.requestOtp(email, otp);
+        await this.sendOtpEmail(email, otp);
 
         return { message: 'OTP sent to email.' };
     }
 
-    async resetPasswordWithOtp(
-        email: string,
-        otp: string,
-        newPassword: string,
-        confirmPassword: string
-    ) {
-        const user = await this.userModel.findOne({ email });
-        if (!user) throw new BadRequestException('User not found.');
-
+    async verifyResetOtp(email: string, otp: string) {
         const record = await this.emailVerifyModel.findOne({ email });
+
         if (!record || !record.isForReset) {
-            throw new BadRequestException('No reset request found for this email.');
+            throw new BadRequestException('No reset request found.');
         }
 
-        if (!record.otpExpiresAt || record.otpExpiresAt.getTime() < Date.now()) {
+        if (!record.otpExpiresAt || record.otpExpiresAt < new Date()) {
             await this.emailVerifyModel.deleteOne({ email });
-            throw new BadRequestException('OTP expired. Please request a new one.');
+            throw new BadRequestException('OTP expired.');
         }
 
-        if (record.otp !== otp) {
+        const valid = await bcrypt.compare(otp, record.otp);
+        if (!valid) {
             record.attempts += 1;
             await record.save();
 
             if (record.attempts >= 3) {
                 await this.emailVerifyModel.deleteOne({ email });
-                throw new BadRequestException('Too many incorrect attempts. Request OTP again.');
+                throw new BadRequestException('Too many incorrect attempts.');
             }
 
             throw new BadRequestException('Incorrect OTP.');
         }
 
+        const otpToken = this.jwtService.sign(
+            { email, type: 'RESET_PASSWORD' },
+            { expiresIn: '10m' }
+        );
+
+        await this.emailVerifyModel.deleteOne({ email });
+
+        return { otpToken };
+    }
+
+    async resetPassword(
+        token: string,
+        newPassword: string,
+        confirmPassword: string
+    ) {
+        let payload: any;
+        try {
+            payload = this.jwtService.verify(token);
+        } catch {
+            throw new BadRequestException('Invalid or expired token.');
+        }
+
+        if (payload.type !== 'RESET_PASSWORD') {
+            throw new BadRequestException('Invalid token.');
+        }
+
         if (newPassword !== confirmPassword) {
             throw new BadRequestException('Passwords do not match.');
         }
+
         if (newPassword.length < 8) {
             throw new BadRequestException('Password must be at least 8 characters.');
         }
 
-        const sameAsOld = await bcrypt.compare(newPassword, user.password);
-        if (sameAsOld) {
+        const user = await this.userModel.findOne({ email: payload.email });
+        if (!user) {
+            throw new BadRequestException('User not found.');
+        }
+
+        const same = await bcrypt.compare(newPassword, user.password);
+        if (same) {
             throw new BadRequestException('New password must be different.');
         }
 
         user.password = await bcrypt.hash(newPassword, 10);
         await user.save();
-
-        await this.emailVerifyModel.deleteOne({ email });
 
         return { message: 'Password reset successfully.' };
     }

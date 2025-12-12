@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Get, Put, UseGuards, Request, Delete, Req } from '@nestjs/common';
+import { Body, Controller, Post, Get, Put, UseGuards, Request, Delete, Req, Headers } from '@nestjs/common';
 import { UserService } from '../Services/user.service';
 import { CreateUserDto } from '../DTO/create-user.dto';
 import { VerifyOtpDto } from '../DTO/verify-otp.dto';
@@ -14,7 +14,7 @@ export class UsersController {
 
     @Post('request-otp')
     @ApiOperation({
-        summary: '1️⃣ Step 1: Request OTP for Signup',
+        summary: 'Step 1: Request OTP for Signup',
         description: 'Register new user and send OTP to email. Use this first!'
     })
     @ApiResponse({ status: 201, description: 'OTP sent successfully to email' })
@@ -25,7 +25,7 @@ export class UsersController {
 
     @Post('verify-otp')
     @ApiOperation({
-        summary: '2️⃣ Step 2: Verify OTP to complete Signup',
+        summary: 'Step 2: Verify OTP to complete Signup',
         description: 'Verify OTP code from email to activate account'
     })
     @ApiResponse({ status: 200, description: 'OTP verified, account activated' })
@@ -53,8 +53,8 @@ export class UsersController {
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
-        summary: '4️⃣ Get User Auth Info (email, status, etc.)',
-        description: '🔒 Requires JWT token. Returns authentication-related info only (not profile data). For profile data, use /api/profile endpoint.'
+        summary: 'Get User Auth Info (email, status, etc.)',
+        description: 'Requires JWT token. Returns authentication-related info only (not profile data). For profile data, use /api/profile endpoint.'
     })
     @ApiResponse({ status: 200, description: 'User auth info retrieved successfully' })
     @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
@@ -102,13 +102,21 @@ export class UsersController {
         return this.userService.requestResetOtp(email);
     }
 
+    @Post('forgot-password/verify-otp')
+    verifyResetOtp(
+        @Body('email') email: string,
+        @Body('otp') otp: string
+    ) {
+        return this.userService.verifyResetOtp(email, otp);
+    }
+
     @Put('forgot-password/reset')
-    resetPasswordWithOtp(@Body() body: any) {
-        return this.userService.resetPasswordWithOtp(
-            body.email,
-            body.otp,
-            body.newPassword,
-            body.confirmPassword
-        );
+    resetPassword(
+        @Headers('authorization') auth: string,
+        @Body('newPassword') newPassword: string,
+        @Body('confirmPassword') confirmPassword: string
+    ) {
+        const token = auth?.replace('Bearer ', '');
+        return this.userService.resetPassword(token, newPassword, confirmPassword);
     }
 }
