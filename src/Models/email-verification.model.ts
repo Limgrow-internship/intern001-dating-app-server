@@ -29,6 +29,9 @@ export class EmailVerification {
 
     @Prop({ type: Date, default: null })
     lockedUntil: Date | null;
+
+    @Prop({ default: false })
+    isForReset: boolean;
 }
 
 export const EmailVerificationSchema = SchemaFactory.createForClass(EmailVerification);
