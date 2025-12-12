@@ -56,3 +56,4 @@ temp/
 models/*.bin
 models/*.json
 
+venv
