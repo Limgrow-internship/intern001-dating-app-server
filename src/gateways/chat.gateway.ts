@@ -75,7 +75,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       duration?: number;
       imgChat?: string;
       clientMessageId?: string;
-      // optional fields from client for reply tracking
       replyToMessageId?: string;
       replyToClientMessageId?: string;
       replyToTimestamp?: string;
@@ -84,16 +83,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     },
     @ConnectedSocket() client: Socket,
   ) {
-    console.log('[chat][send_message] incoming', {
-      matchId: data.matchId,
-      senderId: data.senderId,
-      clientMessageId: data.clientMessageId,
-      replyToMessageId: (data as any).replyToMessageId,
-      replyToClientMessageId: (data as any).replyToClientMessageId,
-      replyToTimestamp: (data as any).replyToTimestamp,
-      replyPreview: (data as any).replyPreview,
-      replySenderName: (data as any).replySenderName,
-    });
     let delivered = true;
   const match = await this.chatService.getMatchById(data.matchId);
   if (match && match.status === 'blocked') {
@@ -101,6 +90,32 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       delivered = false;
     }
   }
+    const isReactionMessage = !data.message && !data.imgChat && !data.audioPath && !!(data as any).replyToMessageId;
+    
+    if (isReactionMessage && (data as any).replyToMessageId) {
+      try {
+        const reaction = (data as any).replyPreview || (data as any).reaction || (data as any).message || null;
+        
+        const updated = await this.chatService.reactMessage({
+          matchId: data.matchId,
+          messageId: (data as any).replyToMessageId,
+          reaction: reaction,
+        });
+
+        const broadcastMessage = {
+          ...updated,
+          _id: updated?.id,
+        };
+
+        this.server.to(data.matchId).emit('message_reaction', broadcastMessage);
+        this.server.to(data.matchId).emit('receive_message', broadcastMessage);
+        
+        return;
+      } catch (error) {
+        console.error('Error updating reaction via send_message:', error?.message || error);
+      }
+    }
+
     const msgObj = {
       senderId: data.senderId,
       message: data.message,
@@ -120,16 +135,11 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
     try {
       const result = await this.chatService.sendMessage(msgObj);
-      console.log('[chat][send_message] saved', {
-        id: (result as any)?._id || (result as any)?.id,
-        clientMessageId: (result as any)?.clientMessageId,
-        matchId: (result as any)?.matchId,
-      });
       const match = await this.chatService.getMatchById(data.matchId);
 
       if (match && match.status === 'blocked') {
         if (match.blockerId !== data.senderId) {
-          client.emit('receive_message', result); // chỉ gửi về cho sender
+          client.emit('receive_message', result);
           return;
         }
       
@@ -137,8 +147,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       }
 
       this.server.to(data.matchId).emit('receive_message', result);
-
-      // Send push notification to the other user (if delivered)
       const recipientId =
         match?.userId === data.senderId ? match?.targetUserId : match?.userId;
       if (
@@ -175,14 +183,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     },
     @ConnectedSocket() client: Socket,
   ) {
-    console.log('[chat][react_message] incoming', {
-      matchId: data.matchId,
-      senderId: data.senderId,
-      messageId: data.messageId,
-      clientMessageId: data.clientMessageId,
-      reaction: data.reaction,
-    });
-
     try {
       const match = await this.chatService.getMatchById(data.matchId);
       if (match && match.status === 'blocked' && match.blockerId !== data.senderId) {

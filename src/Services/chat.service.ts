@@ -94,38 +94,6 @@ export class ChatService {
     return this.mapMessage(saved, messageDto.message ?? '');
   }
 
-  // async getMessages(matchId: string, forUserId?: string) {
-  //   const match = isValidObjectId(matchId)
-  //     ? await this.matchModel.findById(matchId).lean()
-  //     : null;
-  //   const docs = await this.messageModel.find({ matchId }).exec();
-  
-  //   let messages = docs;
-  
-  //   if (match && match.status === 'blocked' && match.blockerId === forUserId) {
-  //     messages = docs.filter(msg =>
-  //       msg.delivered !== false || msg.senderId === forUserId
-  //     );
-  //   }
-  
-  //   return messages.map((msg) => {
-  //     try {
-  //       if (!msg.message) return { ...msg.toObject(), message: '' };
-  //       const decrypted = decryptMessage(msg.message);
-  //       return {
-  //         ...msg.toObject(),
-  //         message: decrypted || msg.message,
-  //       };
-  //     } catch (e) {
-  //       console.error('Decrypt fail message: [encrypted]', e.message);
-  //       return {
-  //         ...msg.toObject(),
-  //         message: '[Decrypt error]',
-  //       };
-  //     }
-  //   });
-  // }
-
   async getMessages(matchId: string, forUserId?: string) {
     const filter: any = { matchId };
     if (forUserId) {
@@ -229,13 +197,31 @@ export class ChatService {
   }
 
   private mapMessage(msg: MessageDocument | any, messageOverride?: string) {
+    if (!msg) return null;
+    
     const plain = typeof msg?.toObject === 'function' ? msg.toObject() : msg;
     const rawId = plain?._id ?? (plain as any)?.id;
-    const id = typeof rawId === 'string' ? rawId : rawId?.toString?.();
+    
+    let id: string;
+    if (typeof rawId === 'string') {
+      id = rawId;
+    } else if (rawId && typeof rawId.toString === 'function') {
+      id = rawId.toString();
+    } else {
+      id = String(rawId || '');
+    }
+
+    let replyToMessageId: string | undefined = plain?.replyToMessageId;
+    if (replyToMessageId) {
+      if (typeof replyToMessageId !== 'string') {
+        replyToMessageId = (replyToMessageId as any).toString();
+      }
+    }
 
     return {
       ...plain,
       id,
+      replyToMessageId,
       message: messageOverride ?? plain?.message ?? '',
     };
   }
