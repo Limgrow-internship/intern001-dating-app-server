@@ -18,6 +18,28 @@ async getHistory(@Param('matchId') matchId: string, @Req() req) {
   return await this.chatService.getMessages(matchId, userId);
 }
 
+  @Post('react')
+  async reactMessage(
+    @Body()
+    body: {
+      matchId: string;
+      messageId?: string;
+      clientMessageId?: string;
+      reaction?: string;
+    },
+    @Req() req,
+  ) {
+    const userId = req.user?.userId;
+    const msg = await this.chatService.reactMessage({
+      matchId: body.matchId,
+      messageId: body.messageId,
+      clientMessageId: body.clientMessageId,
+      reaction: body.reaction,
+    });
+    this.chatGateway.emitMessageReaction(body.matchId, msg);
+    return msg;
+  }
+
   @Post('send')
   async sendMessage(
     @Body()
@@ -29,6 +51,11 @@ async getHistory(@Param('matchId') matchId: string, @Req() req) {
       audioPath?: string;
       duration?: number;
       clientMessageId?: string;
+      replyToMessageId?: string;
+      replyToClientMessageId?: string;
+      replyToTimestamp?: string;
+      replyPreview?: string;
+      replySenderName?: string;
     },
   ) {
     const msg = await this.chatService.sendMessage(messageDto);
@@ -37,6 +64,9 @@ async getHistory(@Param('matchId') matchId: string, @Req() req) {
       matchId: messageDto.matchId,
       senderId: messageDto.senderId,
       clientMessageId: messageDto.clientMessageId,
+      replyToMessageId: messageDto.replyToMessageId,
+      replyToClientMessageId: messageDto.replyToClientMessageId,
+      replyToTimestamp: messageDto.replyToTimestamp,
     });
     return msg;
   }

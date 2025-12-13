@@ -75,6 +75,11 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       duration?: number;
       imgChat?: string;
       clientMessageId?: string;
+      replyToMessageId?: string;
+      replyToClientMessageId?: string;
+      replyToTimestamp?: string;
+      replyPreview?: string;
+      replySenderName?: string;
     },
     @ConnectedSocket() client: Socket,
   ) {
@@ -85,6 +90,32 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       delivered = false;
     }
   }
+    const isReactionMessage = !data.message && !data.imgChat && !data.audioPath && !!(data as any).replyToMessageId;
+    
+    if (isReactionMessage && (data as any).replyToMessageId) {
+      try {
+        const reaction = (data as any).replyPreview || (data as any).reaction || (data as any).message || null;
+        
+        const updated = await this.chatService.reactMessage({
+          matchId: data.matchId,
+          messageId: (data as any).replyToMessageId,
+          reaction: reaction,
+        });
+
+        const broadcastMessage = {
+          ...updated,
+          _id: updated?.id,
+        };
+
+        this.server.to(data.matchId).emit('message_reaction', broadcastMessage);
+        this.server.to(data.matchId).emit('receive_message', broadcastMessage);
+        
+        return;
+      } catch (error) {
+        console.error('Error updating reaction via send_message:', error?.message || error);
+      }
+    }
+
     const msgObj = {
       senderId: data.senderId,
       message: data.message,
@@ -95,6 +126,11 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       matchId: data.matchId,
       delivered,
       clientMessageId: data.clientMessageId,
+      replyToMessageId: (data as any).replyToMessageId,
+      replyToClientMessageId: (data as any).replyToClientMessageId,
+      replyToTimestamp: (data as any).replyToTimestamp,
+      replyPreview: (data as any).replyPreview,
+      replySenderName: (data as any).replySenderName,
     };
 
     try {
@@ -103,7 +139,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
       if (match && match.status === 'blocked') {
         if (match.blockerId !== data.senderId) {
-          client.emit('receive_message', result); // chỉ gửi về cho sender
+          client.emit('receive_message', result);
           return;
         }
       
@@ -111,8 +147,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       }
 
       this.server.to(data.matchId).emit('receive_message', result);
-
-      // Send push notification to the other user (if delivered)
       const recipientId =
         match?.userId === data.senderId ? match?.targetUserId : match?.userId;
       if (
@@ -134,6 +168,44 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       }
     } catch (error) {
       console.error('Error in send_message:', error.message);
+    }
+  }
+
+  @SubscribeMessage('react_message')
+  async handleReactMessage(
+    @MessageBody()
+    data: {
+      matchId: string;
+      senderId: string;
+      messageId?: string;
+      clientMessageId?: string;
+      reaction?: string;
+    },
+    @ConnectedSocket() client: Socket,
+  ) {
+    try {
+      const match = await this.chatService.getMatchById(data.matchId);
+      if (match && match.status === 'blocked' && match.blockerId !== data.senderId) {
+        client.emit('message_reaction', { error: 'blocked' });
+        return;
+      }
+
+      const updated = await this.chatService.reactMessage({
+        matchId: data.matchId,
+        messageId: data.messageId,
+        clientMessageId: data.clientMessageId,
+        reaction: data.reaction,
+      });
+
+      if (match && match.status === 'blocked' && match.blockerId !== data.senderId) {
+        client.emit('message_reaction', updated);
+        return;
+      }
+
+      this.server.to(data.matchId).emit('message_reaction', updated);
+    } catch (error) {
+      console.error('Error in react_message:', error?.message || error);
+      client.emit('message_reaction', { error: 'failed', detail: error?.message });
     }
   }
 
@@ -239,5 +311,9 @@ Bạn đang chat với ${userName} trên một ứng dụng dating. Hãy trò ch
 
   emitMessageToRoom(matchId: string, msg: any) {
     this.server.to(matchId).emit('receive_message', msg);
+  }
+
+  emitMessageReaction(matchId: string, msg: any) {
+    this.server.to(matchId).emit('message_reaction', msg);
   }
 }
