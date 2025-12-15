@@ -11,6 +11,7 @@ import { DistanceCalculator } from '../Utils/distance-calculator';
 interface ScoredProfile {
   profile: ProfileDocument;
   score: number;
+  distance?: number; // Distance in km
   breakdown?: {
     filterScore: number;
     interestScore: number;
@@ -187,6 +188,16 @@ export class RecommendationService {
     // 8. Score each candidate (preferences already fetched above)
     const scoredCandidates: ScoredProfile[] = candidates.map((candidate) => {
       const candidatePhotos = candidatePhotosMap.get(candidate.userId) || [];
+      
+      // Calculate distance for sorting priority
+      let distance: number | undefined;
+      if (userProfile.location?.coordinates && candidate.location?.coordinates) {
+        distance = DistanceCalculator.calculateDistanceFromCoords(
+          userProfile.location.coordinates,
+          candidate.location.coordinates,
+        );
+      }
+      
       const breakdown = this.calculateHybridScore(
         userProfile,
         candidate,
@@ -205,19 +216,46 @@ export class RecommendationService {
       return {
         profile: candidate,
         score: Math.round(totalScore * 100) / 100, // Round to 2 decimals
+        distance,
         breakdown,
       };
     });
 
-    // 9. Sort by score and add some randomization to top results
-    const sorted = scoredCandidates.sort((a, b) => b.score - a.score);
+    // 9. Sort by priority: < 100m first, then by score, then by distance
+    const sorted = scoredCandidates.sort((a, b) => {
+      // Priority 1: People < 100m (0.1km) get highest priority
+      const aIsVeryClose = a.distance !== undefined && a.distance < 0.1;
+      const bIsVeryClose = b.distance !== undefined && b.distance < 0.1;
+      
+      if (aIsVeryClose && !bIsVeryClose) return -1; // a comes first
+      if (!aIsVeryClose && bIsVeryClose) return 1;  // b comes first
+      
+      // Priority 2: If both are very close or both are not, sort by score
+      if (Math.abs(a.score - b.score) > 0.01) {
+        return b.score - a.score; // Higher score first
+      }
+      
+      // Priority 3: If scores are very close, sort by distance (closer first)
+      if (a.distance !== undefined && b.distance !== undefined) {
+        return a.distance - b.distance;
+      }
+      if (a.distance !== undefined) return -1; // a has distance, prioritize
+      if (b.distance !== undefined) return 1;  // b has distance, prioritize
+      
+      return 0; // Equal
+    });
 
-    // Add randomization to top 20% to avoid deterministic ordering
+    // Add randomization to top 20% to avoid deterministic ordering (but keep < 100m priority)
+    const veryCloseCount = sorted.filter(s => s.distance !== undefined && s.distance < 0.1).length;
     const topCount = Math.ceil(sorted.length * 0.2);
-    const topResults = this.shuffleArray(sorted.slice(0, topCount));
-    const restResults = sorted.slice(topCount);
+    
+    // Don't randomize very close matches (< 100m), keep them at top
+    const veryCloseResults = sorted.slice(0, veryCloseCount);
+    const otherTopResults = sorted.slice(veryCloseCount, veryCloseCount + Math.max(0, topCount - veryCloseCount));
+    const shuffledOtherTop = this.shuffleArray(otherTopResults);
+    const restResults = sorted.slice(veryCloseCount + otherTopResults.length);
 
-    const finalResults = [...topResults, ...restResults].slice(0, limit);
+    const finalResults = [...veryCloseResults, ...shuffledOtherTop, ...restResults].slice(0, limit);
     
     this.logger.log(
       `[getRecommendations] User ${userId}: Returning ${finalResults.length} recommendations ` +
@@ -343,6 +381,7 @@ export class RecommendationService {
   /**
    * Calculate location score based on distance
    * Closer = higher score (0-100)
+   * Special boost for < 100m
    */
   private calculateLocationScore(
     userLocation: { coordinates: number[] } | null,
@@ -359,10 +398,14 @@ export class RecommendationService {
       candidateLocation.coordinates,
     );
 
-    // Strongly favor very close matches
-    if (distance <= 1) return 100;
-    if (distance <= 5) return 98;
-    if (distance <= 10) return 95;
+    // Maximum priority for very close matches (< 100m = 0.1km)
+    if (distance < 0.1) return 100; // Maximum score for < 100m
+    
+    // Strongly favor close matches
+    if (distance <= 0.5) return 99;  // < 500m
+    if (distance <= 1) return 98;    // < 1km
+    if (distance <= 5) return 95;    // < 5km
+    if (distance <= 10) return 90;   // < 10km
 
     // Outside preferred range → low score, but not zero
     if (distance > maxDistance) {
@@ -371,9 +414,9 @@ export class RecommendationService {
 
     // Within range: closer = higher. Floor at 30 to keep some weight.
     const normalized = Math.min(distance / Math.max(maxDistance, 1), 1); // 0..1
-    const score = 30 + (1 - normalized) * 70; // 30..100
+    const score = 30 + (1 - normalized) * 60; // 30..90 (since 10km+ already handled above)
 
-    return Math.max(30, Math.min(100, Math.round(score)));
+    return Math.max(30, Math.min(90, Math.round(score)));
   }
 
   /**
