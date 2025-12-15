@@ -19,4 +19,4 @@ pip install onnxruntime
 pip install opencv-python-headless
 pip install numpy
 
-run:     uvicorn main:app --host 0.0.0.0 --port 8000
+run:     exec python -m uvicorn verify_api:app --app-dir ./uniface-api --host 0.0.0.0 --port 8000
