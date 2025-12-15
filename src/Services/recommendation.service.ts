@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Profile, ProfileDocument } from '../Models/profile.model';
@@ -22,6 +22,8 @@ interface ScoredProfile {
 
 @Injectable()
 export class RecommendationService {
+  private readonly logger = new Logger(RecommendationService.name);
+
   constructor(
     @InjectModel(Profile.name) private profileModel: Model<ProfileDocument>,
     @InjectModel(Swipe.name) private swipeModel: Model<SwipeDocument>,
@@ -87,26 +89,77 @@ export class RecommendationService {
       filterQuery.gender = { $in: preferences.genderPreference };
     }
 
+    // Check total profiles matching basic filters (before location)
+    const basicFilterQuery = { ...filterQuery };
+    const totalMatchingProfiles = await this.profileModel.countDocuments(basicFilterQuery);
+    this.logger.log(
+      `[getRecommendations] User ${userId}: Total profiles matching basic filters (mode=${preferences.mode}): ${totalMatchingProfiles}`
+    );
+
     // Distance filter (geospatial query)
-    if (userProfile.location && userProfile.location.coordinates && preferences.maxDistance) {
+    const userLocation = userProfile.location;
+    const userCoordinates = userLocation?.coordinates;
+    const hasLocationFilter = userLocation && userCoordinates && userCoordinates.length >= 2 && preferences.maxDistance;
+    if (hasLocationFilter && userCoordinates) {
       filterQuery.location = {
         $near: {
           $geometry: {
             type: 'Point',
-            coordinates: userProfile.location.coordinates, // [lng, lat]
+            coordinates: userCoordinates, // [lng, lat]
           },
           $maxDistance: preferences.maxDistance * 1000, // Convert km to meters
         },
       };
+      this.logger.log(
+        `[getRecommendations] User ${userId}: Applying location filter - user location: [${userCoordinates[0]}, ${userCoordinates[1]}], maxDistance: ${preferences.maxDistance}km`
+      );
+    } else {
+      this.logger.log(
+        `[getRecommendations] User ${userId}: No location filter - userLocation: ${userLocation ? 'exists' : 'none'}, maxDistance: ${preferences.maxDistance || 'none'}`
+      );
     }
 
     // 5. Fetch candidate profiles
-    const candidates = await this.profileModel
+    let candidates = await this.profileModel
       .find(filterQuery)
       .limit(100) // Limit candidate pool for performance
       .exec();
 
+    this.logger.log(
+      `[getRecommendations] User ${userId}: Found ${candidates.length} candidates from DB query. ` +
+      `Filters: mode=${preferences.mode}, age=${userProfile.age ? `${preferences.ageMin}-${preferences.ageMax}` : 'none'}, ` +
+      `gender=${preferences.genderPreference.join(',')}, maxDistance=${preferences.maxDistance}km, ` +
+      `excluded: ${swipedUserIds.length} swiped, ${blockedUserIds.length} blocked. ` +
+      `Total matching basic filters: ${totalMatchingProfiles}`
+    );
+
+    // If no candidates found and location filter was applied, try without location filter
+    if (candidates.length === 0 && hasLocationFilter && totalMatchingProfiles > 0) {
+      this.logger.warn(
+        `[getRecommendations] User ${userId}: No candidates found with location filter. ` +
+        `Total profiles matching basic filters: ${totalMatchingProfiles}. ` +
+        `Retrying without location filter...`
+      );
+      
+      const candidatesWithoutLocation = await this.profileModel
+        .find(basicFilterQuery)
+        .limit(100)
+        .exec();
+      
+      this.logger.log(
+        `[getRecommendations] User ${userId}: Found ${candidatesWithoutLocation.length} candidates without location filter`
+      );
+      
+      if (candidatesWithoutLocation.length > 0) {
+        candidates = candidatesWithoutLocation;
+        this.logger.log(
+          `[getRecommendations] User ${userId}: Using ${candidates.length} candidates without location filter (location score will be lower)`
+        );
+      }
+    }
+
     if (candidates.length === 0) {
+      this.logger.warn(`[getRecommendations] User ${userId}: No candidates found after all filters`);
       return [];
     }
 
@@ -143,11 +196,11 @@ export class RecommendationService {
       );
 
       const totalScore =
-        breakdown.filterScore * 0.3 +      // 30% - Basic filters
-        breakdown.interestScore * 0.2 +     // 20% - Interests match
+        breakdown.filterScore * 0.25 +     // 25% - Basic filters
+        breakdown.interestScore * 0.15 +   // 15% - Interests match
         breakdown.activityScore * 0.1 +    // 10% - Profile activity
-        breakdown.diversityScore * 0.15 +   // 15% - Diversity
-        breakdown.locationScore * 0.25;    // 25% - Location proximity (NEW)
+        breakdown.diversityScore * 0.1 +   // 10% - Diversity
+        breakdown.locationScore * 0.4;     // 40% - Location proximity (boosted)
 
       return {
         profile: candidate,
@@ -164,7 +217,14 @@ export class RecommendationService {
     const topResults = this.shuffleArray(sorted.slice(0, topCount));
     const restResults = sorted.slice(topCount);
 
-    return [...topResults, ...restResults].slice(0, limit);
+    const finalResults = [...topResults, ...restResults].slice(0, limit);
+    
+    this.logger.log(
+      `[getRecommendations] User ${userId}: Returning ${finalResults.length} recommendations ` +
+      `(from ${candidates.length} candidates, requested ${limit})`
+    );
+
+    return finalResults;
   }
 
   /**
@@ -294,23 +354,26 @@ export class RecommendationService {
       return 50;
     }
 
-    // Calculate actual distance
     const distance = DistanceCalculator.calculateDistanceFromCoords(
       userLocation.coordinates,
       candidateLocation.coordinates,
     );
 
-    // Outside preferred range → low score
+    // Strongly favor very close matches
+    if (distance <= 1) return 100;
+    if (distance <= 5) return 98;
+    if (distance <= 10) return 95;
+
+    // Outside preferred range → low score, but not zero
     if (distance > maxDistance) {
-      return 20; // Still some score, but low
+      return 30;
     }
 
-    // Within range: score from 100 (same location) to 60 (at max distance)
-    // Closer = higher score
-    const normalizedDistance = distance / maxDistance; // 0 to 1
-    const score = 100 - (normalizedDistance * 40); // Scale from 100 to 60
+    // Within range: closer = higher. Floor at 30 to keep some weight.
+    const normalized = Math.min(distance / Math.max(maxDistance, 1), 1); // 0..1
+    const score = 30 + (1 - normalized) * 70; // 30..100
 
-    return Math.max(60, Math.min(100, Math.round(score)));
+    return Math.max(30, Math.min(100, Math.round(score)));
   }
 
   /**
