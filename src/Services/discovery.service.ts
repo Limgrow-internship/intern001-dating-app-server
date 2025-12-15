@@ -76,6 +76,11 @@ export class DiscoveryService {
     // Get recommendations from existing service (it handles filtering)
     const recommendations = await this.recommendationService.getRecommendations(userId, 1);
 
+    this.logger.log(
+      `[getNextMatchCard] User ${userId}: Received ${recommendations.length} recommendations, ` +
+      `blocked: ${blockedUserIds.length}, swiped: ${swipedUserIds.length}`
+    );
+
     // Remove self, blocked, swiped
     const filtered = recommendations.filter(
       (rec) =>
@@ -84,7 +89,12 @@ export class DiscoveryService {
         !swipedUserIds.includes(rec.profile.userId),
     );
 
+    this.logger.log(
+      `[getNextMatchCard] User ${userId}: After filtering, ${filtered.length} candidates remaining`
+    );
+
     if (filtered.length === 0) {
+      this.logger.warn(`[getNextMatchCard] User ${userId}: No candidates available after filtering`);
       return null; // No more candidates
     }
 
@@ -134,6 +144,11 @@ export class DiscoveryService {
       limit + 5, // Get a few extra in case some are filtered
     );
 
+    this.logger.log(
+      `[getMatchCards] User ${userId}: Received ${recommendations.length} recommendations, ` +
+      `requested limit: ${limit}, blocked: ${blockedUserIds.length}, swiped: ${swipedUserIds.length}`
+    );
+
     // Filter out blocked/swiped users
     const filteredRecs = recommendations
       .filter(
@@ -147,6 +162,11 @@ export class DiscoveryService {
     const candidatesWithLocation = filteredRecs.filter(rec => 
       rec.profile.location?.coordinates && rec.profile.location.coordinates.length >= 2
     ).length;
+
+    this.logger.log(
+      `[getMatchCards] User ${userId}: After filtering, ${filteredRecs.length} candidates remaining ` +
+      `(${candidatesWithLocation} with location data)`
+    );
 
     // Fetch photos for all candidates in parallel
     const cardsWithPhotos = await Promise.all(
