@@ -18,6 +18,27 @@ export class Message {
   clientMessageId?: string;
 
   @Prop()
+  replyToMessageId?: string;
+
+  @Prop()
+  replyToClientMessageId?: string;
+
+  @Prop()
+  replyToTimestamp?: Date;
+
+  @Prop()
+  replyPreview?: string;
+
+  @Prop()
+  replySenderId?: string;
+
+  @Prop()
+  replySenderName?: string;
+
+  @Prop()
+  reaction?: string;
+
+  @Prop()
   audioPath?: string;     
 
   @Prop()
